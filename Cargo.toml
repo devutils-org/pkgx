@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/pkgx-core"]
+members = ["crates/pkgx-core", "crates/pkgx-cli"]
 resolver = "2"
 
 [workspace.package]

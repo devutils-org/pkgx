@@ -1,0 +1,36 @@
+Inspect, plan and reconcile native packages conservatively
+
+Usage: pkgx [OPTIONS] <COMMAND>
+
+Commands:
+  demo         Browse synthetic packages without native tools (read-only)
+  managed      List explicit APT management grants (never inferred from installed state)
+  manage       Grant or forget strict-mode management of a concrete installed APT package
+  search       Search existing native metadata (provider-specific query syntax)
+  info         Inspect package records; non-APT adapters require an installed package
+  why          Report native installation reason and its provenance limits
+  deps         Inspect installed native dependency expressions without resolving a graph
+  install      Preview or confirm an installation (execution supports APT only)
+  remove       Preview or confirm a removal (execution supports APT only)
+  plan         Preview a qualified package operation or a resolved manifest
+  export       Export installed identities to an additive TOML manifest
+  diff         Report provider-scoped manifest drift without changing packages
+  apply        Reconcile an additive manifest after plan review and confirmation
+  tui          Open the package browser (read-only unless --allow-apply)
+  audit        Inspect native orphan suggestions; never delete paths or packages
+  clean        Preview cleanup findings; execution is deliberately unsupported
+  recipe       Validate or verify script artifacts without executing them
+  completions  Print Bash, Zsh or Fish completion definitions
+  history      Read transaction records; missing results are running or unknown
+  providers    Detect provider binaries and available adapter capabilities
+  doctor       Report provider diagnostics and interrupted/unknown journal entries
+  list         List installed packages from an explicitly selected provider
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+      --json                   Print versioned JSON results (export and completions emit native text)
+      --sudo                   Use sudo only for confirmed APT execution; previews stay unprivileged
+      --state-dir <STATE_DIR>  Dedicated private transaction directory; inspection never creates it
+      --profile <PROFILE>      Select a manifest profile; repeat to compose several profiles
+  -h, --help                   Print help
+  -V, --version                Print version
