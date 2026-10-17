@@ -5,10 +5,13 @@ pub mod catalog;
 pub mod command;
 pub mod dependency;
 pub mod detection;
+pub mod execution;
 pub mod identity;
+pub mod journal;
 pub mod managed;
 pub mod manifest;
 pub mod planner;
+pub mod privilege;
 pub mod providers;
 pub mod saved_plan;
 pub mod version;
@@ -140,5 +143,7 @@ pub struct ObservedState {
     pub platform: String,
     pub packages: Vec<InstalledPackage>,
 }
+
+pub use execution::ExecutionRecord;
 
 pub use manifest::{DesiredState, Diff};
