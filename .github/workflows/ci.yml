@@ -1,0 +1,71 @@
+name: Rust
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/test_package.py
+  apt-containers:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [debian:bookworm-slim, ubuntu:24.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --release --locked --target x86_64-unknown-linux-musl -p pkgx-cli
+      - name: Validate native APT in disposable container
+        env:
+          CONTAINER_IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm \
+            -v "$PWD/target/x86_64-unknown-linux-musl/release/pkgx:/usr/local/bin/pkgx:ro" \
+            -v "$PWD/tests/containers:/checks:ro" \
+            "$CONTAINER_IMAGE" sh -c 'apt-get update && sh /checks/inspection.sh && sh /checks/transactions.sh && sh /checks/privilege.sh'
+
+  native-inventory:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: archlinux:base
+            check: pacman.sh
+          - image: fedora:latest
+            check: rpm.sh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --release --locked --target x86_64-unknown-linux-musl -p pkgx-cli
+      - name: Inspect disposable native package database
+        env:
+          CONTAINER_IMAGE: ${{ matrix.image }}
+          CONTAINER_CHECK: ${{ matrix.check }}
+        run: |
+          docker run --rm \
+            -v "$PWD/target/x86_64-unknown-linux-musl/release/pkgx:/usr/local/bin/pkgx:ro" \
+            -v "$PWD/tests/containers:/checks:ro" \
+            "$CONTAINER_IMAGE" sh "/checks/$CONTAINER_CHECK"
+  macos-smoke:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace --locked
+      - run: cargo run --locked -p pkgx-cli -- providers --json
+      - run: cargo run --locked -p pkgx-cli -- list --provider brew --json

@@ -1,0 +1,51 @@
+name: Build reviewable release artifacts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            flavor: host
+          - os: ubuntu-latest
+            flavor: musl
+          - os: macos-latest
+            flavor: host
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: cargo test --workspace --locked
+      - run: python3 scripts/test_package.py
+      - name: Build and package the selected target
+        shell: bash
+        env:
+          BUILD_FLAVOR: ${{ matrix.flavor }}
+        run: |
+          set -euo pipefail
+          build_target=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$BUILD_FLAVOR" = musl ]; then
+            sudo apt-get update
+            sudo apt-get install -y musl-tools
+            build_target=x86_64-unknown-linux-musl
+            rustup target add "$build_target"
+          fi
+          cargo build --release --locked --target "$build_target" -p pkgx-cli
+          rustc -vV > /tmp/pkgx-rustc.txt
+          python3 scripts/package.py \
+            --binary "target/$build_target/release/pkgx" \
+            --target "$build_target" --rustc-info /tmp/pkgx-rustc.txt --output-dir dist
+          cd dist
+          shasum -a 256 -c ./*.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkgx-${{ runner.os }}-${{ runner.arch }}-${{ matrix.flavor }}
+          path: |
+            dist/pkgx-*.tar.gz
+            dist/pkgx-*.tar.gz.sha256
