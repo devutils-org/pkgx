@@ -13,6 +13,7 @@ pub mod manifest;
 pub mod planner;
 pub mod privilege;
 pub mod providers;
+pub mod recipe;
 pub mod saved_plan;
 pub mod version;
 
@@ -125,6 +126,9 @@ pub enum Error {
     Unavailable(String),
 }
 
+pub use execution::ExecutionRecord;
+pub use manifest::{DesiredState, Diff};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Confidence {
@@ -139,11 +143,13 @@ pub enum ResourceOwnership {
     DeclaredOnly,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManagedResource {
+    pub resource: recipe::Resource,
+    pub ownership: ResourceOwnership,
+    pub confidence: Confidence,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservedState {
     pub platform: String,
     pub packages: Vec<InstalledPackage>,
 }
-
-pub use execution::ExecutionRecord;
-
-pub use manifest::{DesiredState, Diff};

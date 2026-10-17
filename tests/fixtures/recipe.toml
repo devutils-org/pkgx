@@ -1,0 +1,17 @@
+version = 1
+name = "example-tool"
+pinned_version = "1.2.3"
+url = "https://example.org/releases/1.2.3/install.sh"
+# SHA-256 of fixture bytes "abc"; this is a test fixture, not a runnable recipe.
+sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+interpreter = "sh"
+
+[install]
+args = ["--prefix", "/opt/example-tool"]
+
+[uninstall]
+args = ["--uninstall", "--prefix", "/opt/example-tool"]
+
+[[resources]]
+kind = "file"
+path = "/opt/example-tool/bin/example-tool"
