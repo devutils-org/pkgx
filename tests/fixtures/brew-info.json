@@ -1,0 +1,1 @@
+{"formulae":[{"full_name":"curl","dependencies":["openssl@3"],"installed":[{"version":"8.10.1","installed_on_request":true,"installed_as_dependency":false},{"version":"8.9.0","installed_on_request":false,"installed_as_dependency":true}]}],"casks":[{"full_token":"homebrew/cask/firefox","installed":"131.0"}]}

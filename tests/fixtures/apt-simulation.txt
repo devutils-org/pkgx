@@ -1,0 +1,8 @@
+Reading package lists...
+Building dependency tree...
+The following NEW packages will be installed:
+  curl libcurl4
+Inst libcurl4 (8.0-1 Debian:stable [amd64])
+Inst curl [7.0-1] (8.0-1 Debian:stable [amd64])
+Conf libcurl4 (8.0-1 Debian:stable [amd64])
+Conf curl (8.0-1 Debian:stable [amd64])

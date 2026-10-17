@@ -1,0 +1,15 @@
+Name            : curl
+Version         : 8.10.1-1
+Description     : transfer data
+Architecture    : x86_64
+Depends On      : glibc  libcurl.so=4-64
+Required By     : git
+Optional For    : None
+Install Reason  : Explicitly installed
+
+Name            : zlib
+Version         : 1:1.3.1-2
+Architecture    : x86_64
+Depends On      : glibc
+Required By     : curl
+Install Reason  : Installed as a dependency for another package

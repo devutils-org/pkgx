@@ -1,4 +1,17 @@
+pub mod apt;
+pub mod audit;
+pub mod backend;
+pub mod catalog;
 pub mod command;
+pub mod dependency;
+pub mod detection;
+pub mod identity;
+pub mod managed;
+pub mod manifest;
+pub mod planner;
+pub mod providers;
+pub mod saved_plan;
+pub mod version;
 
 use serde::{Deserialize, Serialize};
 
@@ -127,3 +140,5 @@ pub struct ObservedState {
     pub platform: String,
     pub packages: Vec<InstalledPackage>,
 }
+
+pub use manifest::{DesiredState, Diff};

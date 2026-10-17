@@ -1,0 +1,13 @@
+Package: curl
+Version: 8.0-1
+Architecture: amd64
+Depends: libc6 (>= 2.34), libcurl4 (= 8.0-1) | libcurl4t64
+Description: transfer data with URLs
+ More detail.
+ .
+ Another paragraph.
+
+Package: curl
+Version: 7.0-1
+Architecture: amd64
+Description: previous version
