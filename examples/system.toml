@@ -1,0 +1,8 @@
+version = 1
+
+[system]
+name = "dev-workstation"
+mode = "additive"
+
+[packages.apt]
+install = ["git", "curl", "build-essential"]

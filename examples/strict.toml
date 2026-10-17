@@ -1,0 +1,8 @@
+version = 1
+[system]
+name = "explicitly-managed-apt-scope"
+mode = "strict"
+[packages.apt]
+# Only explicitly granted, undeclared packages can be removed.
+# All ungranted packages remain installed, even with this empty desired set.
+install = []

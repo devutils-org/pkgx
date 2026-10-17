@@ -1,0 +1,20 @@
+version = 1
+
+[system]
+name = "profile-example"
+mode = "additive"
+
+[platforms.linux.packages.apt]
+install = ["curl"]
+
+[platforms.macos.packages.brew]
+install = ["curl:formula"]
+
+[profiles.tools.packages.apt]
+install = ["git"]
+
+[profiles.dev]
+extends = ["tools"]
+
+[profiles.dev.packages.apt]
+install = ["build-essential", "gdb"]
