@@ -160,7 +160,7 @@ fn unsupported_solver_never_runs_a_native_command() {
         calls: Mutex::new(vec![]),
     };
     let backend = NativeBackend {
-        provider: ProviderId::Flatpak,
+        provider: ProviderId::Brew,
         runner: &mock,
     };
     assert!(matches!(

@@ -38,11 +38,13 @@ Implemented native consultation: APT, Pacman, RPM/DNF, default Flatpak user/syst
 and Homebrew formulae/casks. Identities preserve provider, architecture and scope.
 APT supports native simulation and experimental execution. Pacman supports an
 explicitly uncertain --print preview and experimental confirmed execution (ADR 007);
-DNF5 previews a stored resolved transaction and executes with pinned NEVRAs (ADR 010).
+DNF5 previews a stored resolved transaction and executes with pinned NEVRAs (ADR 010);
+Flatpak previews the single offering remote, commit and runtime, and executes with
+--no-related (ADR 011).
 Other native solvers/executors are unsupported;
 there is no implicit provider fallback. See [backend matrix](docs/backends.md).
 
-`install`, `remove` and `apply` execute APT, Pacman or DNF only after a preview and interactive `yes`,
+`install`, `remove` and `apply` execute APT, Pacman, DNF or Flatpak only after a preview and interactive `yes`,
 or explicit --yes. Noninteractive execution without --yes is refused. Revalidation
 follows confirmation. Execution requires native privileges; explicit --sudo can
 delegate the reviewed APT/Pacman transaction without elevating inspection or pkgx state.

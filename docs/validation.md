@@ -96,6 +96,18 @@ observed that `dnf5 replay` skips OpenPGP checks for stored packages, which is w
 the DNF executor never replays (ADR 010). The scratch /tmp is nosuid, so target
 roots live on a namespace tmpfs where setuid sudo works.
 
+## Rootless Flatpak root — 2026-10-18
+
+`tests/sandbox/flatpak-userns.sh` installs Flatpak 1.18.4 into a disposable Arch
+root and runs `tests/containers/flatpak-transactions.sh`, which builds a tiny
+runtime and app into a local unsigned repository (no remote contacted). Passed:
+preview naming the local remote, full commits and the missing runtime; unconfirmed
+install refused; manifest apply installed app and runtime with verified origin and
+commit; repeated apply was empty; runtime removal refused; app removal kept the
+runtime; after adding a second remote offering the same ref, installation was
+refused as ambiguous. Export triggers fail inside the namespace (nested bwrap) and
+were ignored by Flatpak itself.
+
 ## Script recipe sandbox — 2026-10-18
 
 `tests/sandbox/recipe-userns.sh target/debug/pkgx` runs `tests/sandbox/recipe-checks.sh`

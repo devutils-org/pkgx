@@ -6,7 +6,7 @@
 | Debian Bookworm / Ubuntu 24.04 APT | Injected-runner tests + rootless debootstrap roots: inspection, transactions, strict mode, noninteractive sudo (tests/sandbox/debian-userns.sh) | Disposable inspection + transactions | Pending CI |
 | Arch Pacman | Fixtures + injected executor tests + disposable user-namespace Arch root: inspection and transactions (tests/sandbox/arch-userns.sh) | Disposable inspection + transactions | Pending CI |
 | Fedora 44 RPM/DNF5 | Fixtures + injected executor tests + rootless Fedora root: inspection and transactions (tests/sandbox/fedora-userns.sh) | Disposable inspection + transactions | Pending CI |
-| Flatpak default user/system | Scoped injected-runner tests | Not yet configured | No |
+| Flatpak default user/system | Scoped injected-runner tests + rootless Arch root with a local repository (tests/sandbox/flatpak-userns.sh) | Not yet configured | No |
 | macOS Homebrew | JSON fixture tests | macOS build + inventory smoke | Pending CI |
 | Ratatui | TestBackend + Linux pseudo-terminal demo smoke, typed confirmation, worker cancellation | Unit tests | Native execution terminal/macOS checks pending |
 | Explicit APT sudo | Injected credential/argv/order tests + harmless timeout/cancel subprocesses | Non-root disposable APT checks configured | PAM/terminal acceptance pending |

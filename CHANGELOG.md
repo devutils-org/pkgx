@@ -12,6 +12,8 @@
   ownership checks, private receipts and recorded uninstall actions (ADR 008).
 - Add experimental DNF5 execution: stored-transaction previews, NEVRA-pinned
   execution with repository signature checks, verification and sudo (ADR 010).
+- Add experimental Flatpak execution: single-remote ref/commit/runtime previews,
+  --no-related installs, apps-only removal and origin/commit verification (ADR 011).
 - Fix APT parsing of Debian packages named like providers (`apt`, `flatpak`, `dnf`)
   and RPM inventories containing imported `gpg-pubkey` headers.
 - Add rootless debootstrap (Debian/Ubuntu) and Fedora roots for native validation.

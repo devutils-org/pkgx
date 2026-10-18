@@ -216,7 +216,7 @@ fn apply_apt_guarded(
         canceled,
         journal,
         guard,
-        &|operation| planned_version(&operation.native_detail).map(str::to_owned),
+        &|operation, package| planned_version(&operation.native_detail) == Some(&package.version),
     )
 }
 /// Journal intent, run one executor-built native command and verify every
@@ -230,7 +230,8 @@ fn run_verified(
     canceled: &AtomicBool,
     journal: Option<&crate::journal::Journal>,
     guard: Option<&dyn Fn() -> Result<(), Error>>,
-    expected_version: &dyn Fn(&crate::Operation) -> Option<String>,
+    // Whether an installed package satisfies a reviewed install action.
+    installed_as_planned: &dyn Fn(&crate::Operation, &crate::InstalledPackage) -> bool,
 ) -> Result<ExecutionRecord, Error> {
     let journal_id = journal.map(|journal| journal.begin(current)).transpose()?;
     if let Some(check) = guard {
@@ -301,11 +302,10 @@ fn run_verified(
                         }
                     }
                     OperationKind::Install | OperationKind::Configure => {
-                        let expected = expected_version(operation);
                         if !observed
                             .iter()
                             .filter(|p| matches(&operation.package, p))
-                            .any(|p| expected.as_deref() == Some(p.version.as_str()))
+                            .any(|p| installed_as_planned(operation, p))
                         {
                             verified = false;
                         }
@@ -371,7 +371,10 @@ fn run_verified(
 pub fn executable(provider: crate::ProviderId) -> bool {
     matches!(
         provider,
-        crate::ProviderId::Apt | crate::ProviderId::Pacman | crate::ProviderId::Dnf
+        crate::ProviderId::Apt
+            | crate::ProviderId::Pacman
+            | crate::ProviderId::Dnf
+            | crate::ProviderId::Flatpak
     )
 }
 fn single_provider(
@@ -410,6 +413,9 @@ pub fn apply_recorded(
         crate::ProviderId::Dnf => apply_dnf_guarded(
             runner, preview, install, remove, confirmed, canceled, journal, None,
         ),
+        crate::ProviderId::Flatpak => apply_flatpak_guarded(
+            runner, preview, install, remove, confirmed, canceled, journal, None,
+        ),
         provider => Err(Error::Unsupported(format!(
             "{provider} execution; no provider fallback is performed"
         ))),
@@ -433,6 +439,19 @@ pub fn apply_saved(
         crate::ProviderId::Pacman => {
             let check = || saved.validate_at(unix_now()?);
             apply_pacman_guarded(
+                runner,
+                &saved.plan,
+                &saved.install,
+                &saved.remove,
+                confirmed,
+                canceled,
+                journal,
+                Some(&check),
+            )
+        }
+        crate::ProviderId::Flatpak => {
+            let check = || saved.validate_at(unix_now()?);
+            apply_flatpak_guarded(
                 runner,
                 &saved.plan,
                 &saved.install,
@@ -568,13 +587,11 @@ fn apply_pacman_guarded(
         canceled,
         journal,
         guard,
-        &|operation| {
-            pacman_field(operation, 1)
-                .filter(|v| {
-                    v.bytes()
-                        .all(|b| b.is_ascii_alphanumeric() || b".+-:_~".contains(&b))
-                })
-                .map(str::to_owned)
+        &|operation, package| {
+            pacman_field(operation, 1).filter(|v| {
+                v.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b".+-:_~".contains(&b))
+            }) == Some(&package.version)
         },
     )
 }
@@ -685,11 +702,117 @@ fn apply_dnf_guarded(
         canceled,
         journal,
         guard,
-        &|operation| {
+        &|operation, package| {
             nevra(operation)
                 .ok()
                 .and_then(|n| crate::providers::split_nevra(&n).ok())
-                .map(|(_, _, evr)| evr)
+                .is_some_and(|(_, _, evr)| evr == package.version)
+        },
+    )
+}
+/// Flatpak installs from the single reviewed remote with --no-related and verifies
+/// each installed ref's origin and active commit against the review.
+#[allow(clippy::too_many_arguments)]
+fn apply_flatpak_guarded(
+    runner: &dyn CommandRunner,
+    preview: &Plan,
+    install: &[PackageId],
+    remove: &[PackageId],
+    confirmed: bool,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+    guard: Option<&dyn Fn() -> Result<(), Error>>,
+) -> Result<ExecutionRecord, Error> {
+    if let Some(check) = guard {
+        check()?;
+    }
+    if canceled.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(Error::Canceled("Flatpak execution".into()));
+    }
+    if !confirmed {
+        return Err(Error::Safety(
+            "execution requires explicit confirmation".into(),
+        ));
+    }
+    if single_provider(install, remove)? != crate::ProviderId::Flatpak {
+        return Err(Error::InvalidInput("provider mismatch".into()));
+    }
+    let backend = crate::providers::NativeBackend {
+        provider: crate::ProviderId::Flatpak,
+        runner,
+    };
+    let current = backend.plan(install, remove)?;
+    if &current != preview {
+        return Err(Error::Safety(
+            "plan is stale; inspect a new plan before applying".into(),
+        ));
+    }
+    if let Some(check) = guard {
+        check()?;
+    }
+    if current.operations.is_empty() {
+        return Ok(ExecutionRecord {
+            success: true,
+            native_status: None,
+            verified: true,
+            errors: vec![],
+            rollback_attempted: false,
+            observed_before: current.observed_state_fingerprint.clone(),
+            observed_after: Some(current.observed_state_fingerprint.clone()),
+        });
+    }
+    let first = install.iter().chain(remove).next().expect("requested");
+    let scope = crate::providers::flatpak_ref(first)?.1;
+    let mut spec = if remove.is_empty() {
+        let remote = current.operations[0]
+            .native_detail
+            .split('\t')
+            .next()
+            .filter(|r| crate::identity::token_like(r, b"._-"))
+            .ok_or_else(|| Error::Safety("reviewed Flatpak remote is invalid".into()))?;
+        CommandSpec::new(
+            "flatpak",
+            &[
+                "install",
+                &format!("--{scope}"),
+                "--noninteractive",
+                "--no-related",
+                "--",
+                remote,
+            ],
+        )
+    } else {
+        CommandSpec::new(
+            "flatpak",
+            &["uninstall", &format!("--{scope}"), "--noninteractive", "--"],
+        )
+    };
+    // System-scope changes go through Flatpak's own system helper and polkit;
+    // pkgx never wraps flatpak in sudo.
+    for id in install.iter().chain(remove) {
+        let (reference, _) = crate::providers::flatpak_ref(id)?;
+        if current.operations.iter().any(|op| op.package == *id) {
+            spec.args.push(reference.to_owned());
+        }
+    }
+    run_verified(
+        runner,
+        &backend,
+        &current,
+        &spec,
+        canceled,
+        journal,
+        guard,
+        &|operation, package| {
+            let mut fields = operation.native_detail.split('\t');
+            let (Some(remote), Some(commit)) = (fields.next(), fields.next()) else {
+                return false;
+            };
+            package.metadata.get("origin").map(String::as_str) == Some(remote)
+                && package
+                    .metadata
+                    .get("active_commit_prefix")
+                    .is_some_and(|prefix| !prefix.is_empty() && commit.starts_with(prefix.as_str()))
         },
     )
 }

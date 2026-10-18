@@ -10,8 +10,8 @@ Commands:
   info         Inspect package records; non-APT adapters require an installed package
   why          Report native installation reason and its provenance limits
   deps         Inspect installed native dependency expressions without resolving a graph
-  install      Preview or confirm an installation (execution supports APT, Pacman and DNF)
-  remove       Preview or confirm a removal (execution supports APT, Pacman and DNF)
+  install      Preview or confirm an installation (execution: APT, Pacman, DNF, Flatpak)
+  remove       Preview or confirm a removal (execution: APT, Pacman, DNF, Flatpak)
   plan         Preview a qualified package operation or a resolved manifest
   export       Export installed identities to an additive TOML manifest
   diff         Report provider-scoped manifest drift without changing packages

@@ -318,7 +318,12 @@ impl Backend for NativeBackend<'_> {
                 Capability::Dependencies,
                 Capability::DryRun,
             ],
-            ProviderId::Flatpak => vec![Capability::Inventory],
+            ProviderId::Flatpak => vec![
+                Capability::Inventory,
+                Capability::Install,
+                Capability::Remove,
+                Capability::DryRun,
+            ],
             ProviderId::Brew => vec![
                 Capability::Inventory,
                 Capability::Dependencies,
@@ -544,6 +549,9 @@ impl Backend for NativeBackend<'_> {
     fn plan(&self, install: &[PackageId], remove: &[PackageId]) -> Result<Plan, Error> {
         if self.provider == ProviderId::Dnf {
             return dnf_plan(self.runner, install, remove);
+        }
+        if self.provider == ProviderId::Flatpak {
+            return flatpak_plan(self.runner, install, remove);
         }
         if self.provider != ProviderId::Pacman {
             return Err(Error::Unsupported(
@@ -981,6 +989,197 @@ fn dnf_plan(
     }
     if !remove.is_empty() {
         warnings.push("Removal uses --no-autoremove: dependencies stay installed.".into());
+    }
+    Ok(Plan {
+        operations,
+        observed_state_fingerprint: crate::planner::inventory_token(&observed),
+        observed_packages: observed,
+        uncertain: true,
+        warnings,
+    })
+}
+
+/// Split a validated Flatpak identity into its native ref and installation scope.
+pub fn flatpak_ref(id: &PackageId) -> Result<(&str, &str), Error> {
+    validate(id)?;
+    let scope = id
+        .architecture_or_scope
+        .as_deref()
+        .filter(|s| matches!(*s, "user" | "system"))
+        .ok_or_else(|| {
+            Error::InvalidInput("Flatpak identity requires user or system scope".into())
+        })?;
+    Ok((&id.name, scope))
+}
+fn flatpak_query(runner: &dyn CommandRunner, args: &[&str]) -> Result<Option<String>, Error> {
+    let spec = CommandSpec::new("flatpak", args);
+    let result = runner.run(
+        &spec,
+        std::time::Duration::from_secs(60),
+        &std::sync::atomic::AtomicBool::new(false),
+    )?;
+    if result.status != Some(0) {
+        return Ok(None);
+    }
+    String::from_utf8(result.stdout)
+        .map(|s| Some(s.trim().to_owned()))
+        .map_err(|_| Error::Parse("flatpak output is not UTF-8".into()))
+}
+/// Flatpak has no dry run. The preview names exactly one configured remote that
+/// offers each ref, its current commit and any missing runtime from that remote.
+/// Execution uses --no-related, so locale/extension refs are never added implicitly.
+fn flatpak_plan(
+    runner: &dyn CommandRunner,
+    install: &[PackageId],
+    remove: &[PackageId],
+) -> Result<Plan, Error> {
+    if install.is_empty() == remove.is_empty() {
+        return Err(Error::Unsupported(
+            "Flatpak preview accepts either installs or removals, not an empty or mixed transaction".into(),
+        ));
+    }
+    let requests = if remove.is_empty() { install } else { remove };
+    let mut scopes = BTreeSet::new();
+    for id in requests {
+        if id.provider != ProviderId::Flatpak {
+            return Err(Error::InvalidInput("provider mismatch".into()));
+        }
+        scopes.insert(flatpak_ref(id)?.1);
+    }
+    if scopes.len() != 1 {
+        return Err(Error::Safety(
+            "one Flatpak transaction targets one installation scope".into(),
+        ));
+    }
+    let scope = *scopes.first().expect("one scope");
+    let scope_flag = format!("--{scope}");
+    let observed = NativeBackend {
+        provider: ProviderId::Flatpak,
+        runner,
+    }
+    .inventory()?;
+    let installed = |name: &str, any_scope: bool| {
+        observed.iter().any(|p| {
+            p.id.name == name && (any_scope || p.id.architecture_or_scope.as_deref() == Some(scope))
+        })
+    };
+    let mut operations = vec![];
+    let mut warnings = vec![
+        "Flatpak has no native dry run: this preview is the remote's current ref and commit, not a simulated transaction.".into(),
+        "Execution uses --no-related: locale and extension refs are not installed implicitly.".into(),
+    ];
+    if remove.is_empty() {
+        let remotes = flatpak_query(runner, &["remotes", &scope_flag, "--columns=name"])?
+            .ok_or_else(|| Error::Unavailable("cannot list Flatpak remotes".into()))?;
+        let remotes: Vec<_> = remotes
+            .lines()
+            .map(str::trim)
+            .filter(|r| !r.is_empty())
+            .collect();
+        let mut chosen = None::<String>;
+        for id in install {
+            let (reference, _) = flatpak_ref(id)?;
+            if installed(reference, false) {
+                warnings.push(format!("{id} is already installed; nothing to do."));
+                continue;
+            }
+            let mut offered = vec![];
+            for remote in &remotes {
+                if !crate::identity::token_like(remote, b"._-") {
+                    return Err(Error::Parse("unexpected Flatpak remote name".into()));
+                }
+                if let Some(commit) = flatpak_query(
+                    runner,
+                    &[
+                        "remote-info",
+                        &scope_flag,
+                        "--show-commit",
+                        remote,
+                        reference,
+                    ],
+                )? {
+                    offered.push(((*remote).to_owned(), commit));
+                }
+            }
+            let [(remote, commit)] = offered.as_slice() else {
+                return Err(Error::Safety(format!(
+                    "{id} must be offered by exactly one configured {scope} remote (found {}); pkgx never chooses an origin",
+                    offered.len()
+                )));
+            };
+            if commit.len() != 64 || !commit.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return Err(Error::Parse(
+                    "Flatpak remote commit is not a full digest".into(),
+                ));
+            }
+            if chosen.get_or_insert_with(|| remote.clone()) != remote {
+                return Err(Error::Safety(
+                    "one Flatpak transaction uses one remote".into(),
+                ));
+            }
+            if reference.starts_with("app/") {
+                let runtime = flatpak_query(
+                    runner,
+                    &[
+                        "remote-info",
+                        &scope_flag,
+                        "--show-runtime",
+                        remote,
+                        reference,
+                    ],
+                )?
+                .ok_or_else(|| Error::Unavailable("cannot read the app's runtime".into()))?;
+                let runtime_ref = format!("runtime/{runtime}");
+                if !installed(&runtime_ref, true) {
+                    let runtime_id =
+                        parse_name(ProviderId::Flatpak, &format!("{runtime_ref}:{scope}"))?;
+                    let runtime_commit = flatpak_query(
+                        runner,
+                        &["remote-info", &scope_flag, "--show-commit", remote, &runtime_ref],
+                    )?
+                    .ok_or_else(|| Error::Safety(format!(
+                        "{runtime_id} is required but not offered by {remote}; install it explicitly first"
+                    )))?;
+                    if !operations
+                        .iter()
+                        .any(|op: &Operation| op.package == runtime_id)
+                    {
+                        operations.push(Operation {
+                            kind: OperationKind::Install,
+                            package: runtime_id,
+                            risk: RiskLevel::RequiresReview,
+                            native_detail: format!(
+                                "{remote}\t{runtime_commit}\truntime dependency"
+                            ),
+                        });
+                    }
+                }
+            }
+            operations.push(Operation {
+                kind: OperationKind::Install,
+                package: id.clone(),
+                risk: RiskLevel::RequiresReview,
+                native_detail: format!("{remote}\t{commit}\trequested"),
+            });
+        }
+    } else {
+        for id in remove {
+            let (reference, _) = flatpak_ref(id)?;
+            if !reference.starts_with("app/") {
+                return Err(Error::Safety(
+                    "Flatpak runtime removal is not supported; apps may depend on it".into(),
+                ));
+            }
+            if !installed(reference, false) {
+                return Err(Error::Unavailable(format!("{id} is not installed")));
+            }
+            operations.push(Operation {
+                kind: OperationKind::Remove,
+                package: id.clone(),
+                risk: RiskLevel::RequiresReview,
+                native_detail: "uninstall; its runtime stays installed".into(),
+            });
+        }
     }
     Ok(Plan {
         operations,

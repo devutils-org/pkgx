@@ -84,7 +84,7 @@ enum Commands {
     Why { package: String },
     /// Inspect installed native dependency expressions without resolving a graph.
     Deps { package: String },
-    /// Preview or confirm an installation (execution supports APT, Pacman and DNF).
+    /// Preview or confirm an installation (execution: APT, Pacman, DNF, Flatpak).
     Install {
         package: String,
         #[arg(long)]
@@ -92,7 +92,7 @@ enum Commands {
         #[arg(long, conflicts_with = "dry_run")]
         yes: bool,
     },
-    /// Preview or confirm a removal (execution supports APT, Pacman and DNF).
+    /// Preview or confirm a removal (execution: APT, Pacman, DNF, Flatpak).
     Remove {
         package: String,
         #[arg(long)]
@@ -672,7 +672,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     if !pkgx_core::execution::executable(saved.provider) {
                         return Err(pkgx_core::Error::Unsupported(
-                            "saved-plan execution supports APT, Pacman and DNF only".into(),
+                            "saved-plan execution supports APT, Pacman, DNF and Flatpak only"
+                                .into(),
                         )
                         .into());
                     }
@@ -987,7 +988,7 @@ fn transact(
     }
     if !dry_run && !pkgx_core::execution::executable(provider) {
         return Err(pkgx_core::Error::Unsupported(format!(
-            "{provider} execution is not implemented (APT, Pacman and DNF only); no provider fallback is performed"
+            "{provider} execution is not implemented (APT, Pacman, DNF and Flatpak only); no provider fallback is performed"
         ))
         .into());
     }
