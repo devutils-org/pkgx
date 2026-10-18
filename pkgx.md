@@ -122,7 +122,7 @@ Planning and execution are separate: backends can propose native operations; the
 
 **Tasks**
 
-- [ ] Implement each provider using the same capabilities contract. (APT, Pacman, DNF and Flatpak execute; Homebrew remains inspection-only.)
+- [x] Implement each provider using the same capabilities contract. (APT, Pacman, DNF, Flatpak and Homebrew formulae; ADR 002, 007, 010–012.)
 - [x] Record provider-specific package identity and install scope (system/user where relevant).
 - [x] Handle ambiguous names and collisions with explicit provider qualification.
 - [ ] Test dependency/orphan semantics per backend, not via assumed universal behavior.

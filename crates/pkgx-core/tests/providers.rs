@@ -160,7 +160,7 @@ fn unsupported_solver_never_runs_a_native_command() {
         calls: Mutex::new(vec![]),
     };
     let backend = NativeBackend {
-        provider: ProviderId::Brew,
+        provider: ProviderId::Script,
         runner: &mock,
     };
     assert!(matches!(
@@ -236,4 +236,18 @@ fn rpm_inventory_ignores_imported_openpgp_key_headers() {
     let packages = pkgx_core::providers::parse_rpm(rows).unwrap();
     assert_eq!(packages.len(), 1);
     assert!(pkgx_core::providers::parse_rpm("other\t(none)\t0:1-1\n").is_err());
+}
+#[test]
+fn homebrew_7_receipts_without_dependency_flag_keep_native_reasons() {
+    let json = r#"{"formulae":[{"full_name":"jq","installed":[{"version":"1.8.2","installed_on_request":true}]},{"full_name":"oniguruma","installed":[{"version":"6.9.10","installed_on_request":false}]},{"full_name":"x","installed":[{"version":"1","installed_on_request":true,"installed_as_dependency":true}]}],"casks":[]}"#;
+    let packages = pkgx_core::providers::parse_brew(json).unwrap();
+    let reasons: Vec<_> = packages.iter().map(|p| p.install_reason).collect();
+    assert_eq!(
+        reasons,
+        [
+            pkgx_core::InstallReason::Explicit,
+            pkgx_core::InstallReason::Dependency,
+            pkgx_core::InstallReason::Unknown
+        ]
+    );
 }

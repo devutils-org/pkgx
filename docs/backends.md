@@ -14,7 +14,7 @@ the parsed version, minimum-target check and `certified: false`.
 | Pacman | C-locale `-Qi` records | Installed records / native reason | POSIX regex, existing sync database | `--print` estimate + HoldPkg/IgnorePkg policy | Experimental, confirmed (ADR 007) | `-Qdtq` with native dependency marks |
 | DNF | RPM installed database | Installed records / reason unknown | Unsupported | dnf5 `--store` resolved transaction | Experimental, confirmed (ADR 010) | Unsupported |
 | Flatpak | Default user and system installations | Installed records / reason unknown | Unsupported | Single-remote ref/commit/runtime preview (uncertain) | Experimental, confirmed, apps-only removal (ADR 011) | Unsupported |
-| Homebrew | JSON v2, installed kegs/casks | Installed records / receipt reason when available | Unsupported | Unsupported | Unsupported | Dependency leaves with native mark checks |
+| Homebrew | JSON v2, installed kegs/casks | Installed records / receipt reason when available | Unsupported | Formula `--dry-run` (uncertain) | Experimental, confirmed, formulae only (ADR 012) | Dependency leaves with native mark checks |
 
 Examples of fully qualified identities:
 

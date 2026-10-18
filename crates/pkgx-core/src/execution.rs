@@ -375,6 +375,7 @@ pub fn executable(provider: crate::ProviderId) -> bool {
             | crate::ProviderId::Pacman
             | crate::ProviderId::Dnf
             | crate::ProviderId::Flatpak
+            | crate::ProviderId::Brew
     )
 }
 fn single_provider(
@@ -416,6 +417,9 @@ pub fn apply_recorded(
         crate::ProviderId::Flatpak => apply_flatpak_guarded(
             runner, preview, install, remove, confirmed, canceled, journal, None,
         ),
+        crate::ProviderId::Brew => apply_brew_guarded(
+            runner, preview, install, remove, confirmed, canceled, journal, None,
+        ),
         provider => Err(Error::Unsupported(format!(
             "{provider} execution; no provider fallback is performed"
         ))),
@@ -439,6 +443,19 @@ pub fn apply_saved(
         crate::ProviderId::Pacman => {
             let check = || saved.validate_at(unix_now()?);
             apply_pacman_guarded(
+                runner,
+                &saved.plan,
+                &saved.install,
+                &saved.remove,
+                confirmed,
+                canceled,
+                journal,
+                Some(&check),
+            )
+        }
+        crate::ProviderId::Brew => {
+            let check = || saved.validate_at(unix_now()?);
+            apply_brew_guarded(
                 runner,
                 &saved.plan,
                 &saved.install,
@@ -708,6 +725,88 @@ fn apply_dnf_guarded(
                 .and_then(|n| crate::providers::split_nevra(&n).ok())
                 .is_some_and(|(_, _, evr)| evr == package.version)
         },
+    )
+}
+/// Homebrew formulae only, never as root or through sudo. Installs and removals
+/// carry no force/ignore-dependency options; versions are verified afterwards.
+#[allow(clippy::too_many_arguments)]
+fn apply_brew_guarded(
+    runner: &dyn CommandRunner,
+    preview: &Plan,
+    install: &[PackageId],
+    remove: &[PackageId],
+    confirmed: bool,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+    guard: Option<&dyn Fn() -> Result<(), Error>>,
+) -> Result<ExecutionRecord, Error> {
+    if let Some(check) = guard {
+        check()?;
+    }
+    if canceled.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(Error::Canceled("Homebrew execution".into()));
+    }
+    if !confirmed {
+        return Err(Error::Safety(
+            "execution requires explicit confirmation".into(),
+        ));
+    }
+    if single_provider(install, remove)? != crate::ProviderId::Brew {
+        return Err(Error::InvalidInput("provider mismatch".into()));
+    }
+    #[cfg(unix)]
+    // SAFETY: geteuid returns a scalar process identifier.
+    if unsafe { libc::geteuid() } == 0 {
+        return Err(Error::Safety("Homebrew is never run as root".into()));
+    }
+    let backend = crate::providers::NativeBackend {
+        provider: crate::ProviderId::Brew,
+        runner,
+    };
+    let current = backend.plan(install, remove)?;
+    if &current != preview {
+        return Err(Error::Safety(
+            "plan is stale; inspect a new plan before applying".into(),
+        ));
+    }
+    if let Some(check) = guard {
+        check()?;
+    }
+    if current.operations.is_empty() {
+        return Ok(ExecutionRecord {
+            success: true,
+            native_status: None,
+            verified: true,
+            errors: vec![],
+            rollback_attempted: false,
+            observed_before: current.observed_state_fingerprint.clone(),
+            observed_after: Some(current.observed_state_fingerprint.clone()),
+        });
+    }
+    let mut spec = crate::providers::brew_spec(if remove.is_empty() {
+        &["install", "--formula"]
+    } else {
+        &["uninstall", "--formula"]
+    });
+    for id in install.iter().chain(remove) {
+        if current.operations.iter().any(|op| op.package == *id) {
+            spec.args.push(id.name.clone());
+        }
+    }
+    if spec.args.len() == 2 {
+        return Err(Error::Safety(
+            "reviewed Homebrew plan has no requested formula".into(),
+        ));
+    }
+    run_verified(
+        runner,
+        &backend,
+        &current,
+        &spec,
+        canceled,
+        journal,
+        guard,
+        &|operation, package| operation.native_detail.split('\t').nth(1) == Some(&package.version),
     )
 }
 /// Flatpak installs from the single reviewed remote with --no-related and verifies

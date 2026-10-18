@@ -108,6 +108,18 @@ runtime; after adding a second remote offering the same ref, installation was
 refused as ambiguous. Export triggers fail inside the namespace (nested bwrap) and
 were ignored by Flatpak itself.
 
+## Rootless Homebrew root — 2026-10-18
+
+`tests/sandbox/brew-userns.sh` runs `tests/containers/brew-transactions.sh` as an
+unprivileged user in a disposable Arch root after cloning Homebrew 7.0.9 (latest
+tag). Passed: preview of jq plus oniguruma, unconfirmed install refused, manifest
+apply installed both with verified versions, repeated apply empty, oniguruma
+reported as a native dependency, removal of a required formula refused, jq removal
+kept oniguruma, the audit reported oniguruma and `clean --orphans` removed it, and
+the journal recorded the results. Two defects were found and fixed on the way:
+Homebrew 7 receipts lack `installed_as_dependency` (reasons were `unknown`), and
+`brew uninstall` autoremoves dependencies unless HOMEBREW_NO_AUTOREMOVE is set.
+
 ## Script recipe sandbox — 2026-10-18
 
 `tests/sandbox/recipe-userns.sh target/debug/pkgx` runs `tests/sandbox/recipe-checks.sh`

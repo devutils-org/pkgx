@@ -52,6 +52,7 @@ pub fn output(runner: &dyn CommandRunner, mut spec: CommandSpec) -> Result<Strin
             "HOMEBREW_NO_INSTALL_CLEANUP",
             "HOMEBREW_NO_ENV_HINTS",
             "HOMEBREW_NO_COLOR",
+            "HOMEBREW_NO_AUTOREMOVE",
         ] {
             spec.env.insert(key.into(), "1".into());
         }
@@ -242,8 +243,9 @@ pub fn parse_brew(input: &str) -> Result<Vec<InstalledPackage>, Error> {
                     .get("installed_as_dependency")
                     .and_then(|v| v.as_bool()),
             ) {
-                (Some(true), Some(false)) => InstallReason::Explicit,
-                (Some(false), Some(true)) => InstallReason::Dependency,
+                (Some(true), Some(false) | None) => InstallReason::Explicit,
+                // Homebrew 7 receipts no longer carry installed_as_dependency.
+                (Some(false), Some(true) | None) => InstallReason::Dependency,
                 _ => InstallReason::Unknown,
             };
             let mut metadata = BTreeMap::from([(
@@ -326,8 +328,11 @@ impl Backend for NativeBackend<'_> {
             ],
             ProviderId::Brew => vec![
                 Capability::Inventory,
+                Capability::Install,
+                Capability::Remove,
                 Capability::Dependencies,
                 Capability::Orphans,
+                Capability::DryRun,
             ],
             _ => vec![],
         }
@@ -552,6 +557,9 @@ impl Backend for NativeBackend<'_> {
         }
         if self.provider == ProviderId::Flatpak {
             return flatpak_plan(self.runner, install, remove);
+        }
+        if self.provider == ProviderId::Brew {
+            return brew_plan(self.runner, install, remove);
         }
         if self.provider != ProviderId::Pacman {
             return Err(Error::Unsupported(
@@ -1178,6 +1186,192 @@ fn flatpak_plan(
                 package: id.clone(),
                 risk: RiskLevel::RequiresReview,
                 native_detail: "uninstall; its runtime stays installed".into(),
+            });
+        }
+    }
+    Ok(Plan {
+        operations,
+        observed_state_fingerprint: crate::planner::inventory_token(&observed),
+        observed_packages: observed,
+        uncertain: true,
+        warnings,
+    })
+}
+
+/// Homebrew environment for every pkgx-built brew command: no auto-update,
+/// analytics, implicit cleanup, hints or colors.
+pub fn brew_spec(args: &[&str]) -> CommandSpec {
+    let mut spec = CommandSpec::new("brew", args);
+    for key in [
+        "HOMEBREW_NO_AUTO_UPDATE",
+        "HOMEBREW_NO_ANALYTICS",
+        "HOMEBREW_NO_INSTALL_CLEANUP",
+        "HOMEBREW_NO_ENV_HINTS",
+        "HOMEBREW_NO_COLOR",
+        "HOMEBREW_NO_AUTOREMOVE",
+    ] {
+        spec.env.insert(key.into(), "1".into());
+    }
+    spec
+}
+fn brew_formula(id: &PackageId) -> Result<&str, Error> {
+    validate(id)?;
+    if id.architecture_or_scope.as_deref() != Some("formula") {
+        return Err(Error::Unsupported(
+            "Homebrew cask execution; only formulae are supported".into(),
+        ));
+    }
+    Ok(&id.name)
+}
+/// Parse `brew install --dry-run` sections ("Would install N formula(e)" and
+/// "Would install N dependencies for X") into name/version rows. Recent Homebrew
+/// omits dependency versions; those rows carry an empty version.
+pub fn parse_brew_dry_run(text: &str) -> Result<Vec<(String, String, bool)>, Error> {
+    let mut rows = vec![];
+    let mut section = None::<bool>;
+    for line in text.lines() {
+        if let Some(header) = line.strip_prefix("==> ") {
+            section = if header.starts_with("Would install") {
+                Some(header.contains(" for "))
+            } else if header.starts_with("Would ") {
+                return Err(Error::Safety(format!(
+                    "Homebrew dry run reports an unsupported action: {header}"
+                )));
+            } else {
+                None
+            };
+            continue;
+        }
+        let Some(dependency) = section else { continue };
+        if line.trim().is_empty() {
+            continue;
+        }
+        for item in line.split(", ") {
+            let mut fields = item.split_whitespace();
+            let (Some(name), version, None) = (fields.next(), fields.next(), fields.next()) else {
+                return Err(Error::Parse("unexpected Homebrew dry-run row".into()));
+            };
+            let version = version.unwrap_or_default();
+            parse_name(ProviderId::Brew, &format!("{name}:formula"))?;
+            if !version
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"._+-".contains(&b))
+            {
+                return Err(Error::Parse("unexpected Homebrew version".into()));
+            }
+            rows.push((name.to_owned(), version.to_owned(), dependency));
+        }
+    }
+    Ok(rows)
+}
+fn brew_plan(
+    runner: &dyn CommandRunner,
+    install: &[PackageId],
+    remove: &[PackageId],
+) -> Result<Plan, Error> {
+    if install.is_empty() == remove.is_empty() {
+        return Err(Error::Unsupported(
+            "Homebrew preview accepts either installs or removals, not an empty or mixed transaction".into(),
+        ));
+    }
+    let requests = if remove.is_empty() { install } else { remove };
+    for id in requests {
+        if id.provider != ProviderId::Brew {
+            return Err(Error::InvalidInput("provider mismatch".into()));
+        }
+        brew_formula(id)?;
+    }
+    let observed = NativeBackend {
+        provider: ProviderId::Brew,
+        runner,
+    }
+    .inventory()?;
+    let mut operations = vec![];
+    let mut warnings = vec![
+        "Homebrew --dry-run lists formulae to install; post-install steps, linking and source builds are not modeled.".into(),
+        "Homebrew cannot pin versions; execution verifies the installed versions against this preview.".into(),
+    ];
+    if remove.is_empty() {
+        let mut spec = brew_spec(&["install", "--dry-run", "--formula"]);
+        spec.args.extend(install.iter().map(|id| id.name.clone()));
+        let mut rows = parse_brew_dry_run(&output(runner, spec)?)?;
+        let unversioned: Vec<String> = rows
+            .iter()
+            .filter(|row| row.1.is_empty())
+            .map(|row| row.0.clone())
+            .collect();
+        if !unversioned.is_empty() {
+            let mut info = brew_spec(&["info", "--json=v2", "--formula"]);
+            info.args.extend(unversioned.iter().cloned());
+            let value: serde_json::Value = serde_json::from_str(&output(runner, info)?)
+                .map_err(|_| Error::Parse("invalid Homebrew JSON".into()))?;
+            for formula in value["formulae"].as_array().into_iter().flatten() {
+                let (Some(name), Some(stable)) = (
+                    formula["name"].as_str(),
+                    formula["versions"]["stable"].as_str(),
+                ) else {
+                    continue;
+                };
+                let version = match formula["revision"].as_u64() {
+                    Some(0) | None => stable.to_owned(),
+                    Some(revision) => format!("{stable}_{revision}"),
+                };
+                for row in rows
+                    .iter_mut()
+                    .filter(|row| row.0 == name && row.1.is_empty())
+                {
+                    row.1 = version.clone();
+                }
+            }
+            if rows.iter().any(|row| row.1.is_empty()) {
+                return Err(Error::Parse(
+                    "cannot determine a Homebrew dependency version".into(),
+                ));
+            }
+        }
+        for (name, version, dependency) in rows {
+            operations.push(Operation {
+                kind: OperationKind::Install,
+                package: parse_name(ProviderId::Brew, &format!("{name}:formula"))?,
+                risk: RiskLevel::RequiresReview,
+                native_detail: format!(
+                    "{name}\t{version}\t{}",
+                    if dependency {
+                        "dependency"
+                    } else {
+                        "requested"
+                    }
+                ),
+            });
+        }
+        for id in install {
+            if !operations.iter().any(|op| op.package.name == id.name) {
+                warnings.push(format!("{id} is already installed; nothing to do."));
+            }
+        }
+    } else {
+        for id in remove {
+            let kegs = observed.iter().filter(|p| p.id == *id).count();
+            if kegs != 1 {
+                return Err(Error::Safety(format!(
+                    "{id} must have exactly one installed keg to remove (found {kegs})"
+                )));
+            }
+            let dependents = output(
+                runner,
+                brew_spec(&["uses", "--installed", "--formula", &id.name]),
+            )?;
+            if !dependents.trim().is_empty() {
+                return Err(Error::Safety(format!(
+                    "{id} is required by installed formulae: {}",
+                    dependents.split_whitespace().collect::<Vec<_>>().join(", ")
+                )));
+            }
+            operations.push(Operation {
+                kind: OperationKind::Remove,
+                package: id.clone(),
+                risk: RiskLevel::RequiresReview,
+                native_detail: "brew uninstall --formula; dependencies stay installed".into(),
             });
         }
     }

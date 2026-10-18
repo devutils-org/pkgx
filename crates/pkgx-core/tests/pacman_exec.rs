@@ -313,7 +313,11 @@ fn providers_without_executor_and_mixed_requests_are_refused() {
         &[id("ripgrep")],
         &[],
     );
-    let dnf = parse_name(ProviderId::Brew, "curl:formula").unwrap();
+    let dnf = PackageId {
+        provider: ProviderId::Script,
+        name: "tool".into(),
+        architecture_or_scope: None,
+    };
     assert!(matches!(
         apply_recorded(
             &mock,

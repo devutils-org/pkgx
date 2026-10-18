@@ -1359,7 +1359,11 @@ mod tests {
         mixed.plan.operations[0].package.provider = ProviderId::Apt;
         browser.pending = Some(mixed);
         assert!(!browser.arm());
-        let flatpak = pkgx_core::identity::parse_name(ProviderId::Brew, "curl:formula").unwrap();
+        let flatpak = pkgx_core::PackageId {
+            provider: ProviderId::Script,
+            name: "tool".into(),
+            architecture_or_scope: None,
+        };
         let mut unsupported = pending(ProviderId::Apt);
         unsupported.plan.operations[0].package = flatpak.clone();
         unsupported.install = vec![flatpak];
