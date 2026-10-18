@@ -12,7 +12,7 @@ the parsed version, minimum-target check and `certified: false`.
 | --- | --- | --- | --- | --- | --- | --- |
 | APT | dpkg + APT marks | Native records / reverse dependencies | POSIX regex, cached metadata | Native simulation | Experimental, confirmed | Native simulation with hold/critical checks |
 | Pacman | C-locale `-Qi` records | Installed records / native reason | POSIX regex, existing sync database | `--print` estimate + HoldPkg/IgnorePkg policy | Experimental, confirmed (ADR 007) | `-Qdtq` with native dependency marks |
-| DNF | RPM installed database | Installed records / reason unknown | Unsupported | Unsupported | Unsupported | Unsupported |
+| DNF | RPM installed database | Installed records / reason unknown | Unsupported | dnf5 `--store` resolved transaction | Experimental, confirmed (ADR 010) | Unsupported |
 | Flatpak | Default user and system installations | Installed records / reason unknown | Unsupported | Unsupported | Unsupported | Unsupported |
 | Homebrew | JSON v2, installed kegs/casks | Installed records / receipt reason when available | Unsupported | Unsupported | Unsupported | Dependency leaves with native mark checks |
 

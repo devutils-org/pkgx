@@ -369,7 +369,10 @@ fn run_verified(
 }
 /// Providers with a reviewed native executor. Others stay preview-only.
 pub fn executable(provider: crate::ProviderId) -> bool {
-    matches!(provider, crate::ProviderId::Apt | crate::ProviderId::Pacman)
+    matches!(
+        provider,
+        crate::ProviderId::Apt | crate::ProviderId::Pacman | crate::ProviderId::Dnf
+    )
 }
 fn single_provider(
     install: &[PackageId],
@@ -404,6 +407,9 @@ pub fn apply_recorded(
         crate::ProviderId::Pacman => apply_pacman_guarded(
             runner, preview, install, remove, confirmed, canceled, journal, None,
         ),
+        crate::ProviderId::Dnf => apply_dnf_guarded(
+            runner, preview, install, remove, confirmed, canceled, journal, None,
+        ),
         provider => Err(Error::Unsupported(format!(
             "{provider} execution; no provider fallback is performed"
         ))),
@@ -427,6 +433,19 @@ pub fn apply_saved(
         crate::ProviderId::Pacman => {
             let check = || saved.validate_at(unix_now()?);
             apply_pacman_guarded(
+                runner,
+                &saved.plan,
+                &saved.install,
+                &saved.remove,
+                confirmed,
+                canceled,
+                journal,
+                Some(&check),
+            )
+        }
+        crate::ProviderId::Dnf => {
+            let check = || saved.validate_at(unix_now()?);
+            apply_dnf_guarded(
                 runner,
                 &saved.plan,
                 &saved.install,
@@ -556,6 +575,121 @@ fn apply_pacman_guarded(
                         .all(|b| b.is_ascii_alphanumeric() || b".+-:_~".contains(&b))
                 })
                 .map(str::to_owned)
+        },
+    )
+}
+/// DNF5 re-resolves at execution: requested packages are pinned to the reviewed
+/// NEVRAs (repository OpenPGP checks stay enabled), then every planned NEVRA and
+/// the untouched inventory are verified. Stored transactions are never replayed,
+/// because replay skips repository signature checks by default.
+#[allow(clippy::too_many_arguments)]
+fn apply_dnf_guarded(
+    runner: &dyn CommandRunner,
+    preview: &Plan,
+    install: &[PackageId],
+    remove: &[PackageId],
+    confirmed: bool,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+    guard: Option<&dyn Fn() -> Result<(), Error>>,
+) -> Result<ExecutionRecord, Error> {
+    if let Some(check) = guard {
+        check()?;
+    }
+    if canceled.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(Error::Canceled("DNF execution".into()));
+    }
+    if !confirmed {
+        return Err(Error::Safety(
+            "execution requires explicit confirmation".into(),
+        ));
+    }
+    if single_provider(install, remove)? != crate::ProviderId::Dnf {
+        return Err(Error::InvalidInput("provider mismatch".into()));
+    }
+    let backend = crate::providers::NativeBackend {
+        provider: crate::ProviderId::Dnf,
+        runner,
+    };
+    let current = backend.plan(install, remove)?;
+    if &current != preview {
+        return Err(Error::Safety(
+            "plan is stale; inspect a new plan before applying".into(),
+        ));
+    }
+    if let Some(check) = guard {
+        check()?;
+    }
+    if current.operations.is_empty() {
+        return Ok(ExecutionRecord {
+            success: true,
+            native_status: None,
+            verified: true,
+            errors: vec![],
+            rollback_attempted: false,
+            observed_before: current.observed_state_fingerprint.clone(),
+            observed_after: Some(current.observed_state_fingerprint.clone()),
+        });
+    }
+    let nevra = |operation: &crate::Operation| {
+        operation
+            .native_detail
+            .split('\t')
+            .next()
+            .map(str::to_owned)
+            .ok_or_else(|| Error::Safety("reviewed DNF operation lacks a NEVRA".into()))
+    };
+    let template = if remove.is_empty() {
+        crate::providers::DNF_INSTALL
+    } else {
+        crate::providers::DNF_REMOVE
+    };
+    let mut spec = CommandSpec::new(template[0], &template[1..]);
+    spec.requires_privilege = true;
+    for id in install.iter().chain(remove) {
+        let matching: Vec<_> = current
+            .operations
+            .iter()
+            .filter(|op| {
+                op.package.name == id.name
+                    && id
+                        .architecture_or_scope
+                        .as_ref()
+                        .is_none_or(|a| op.package.architecture_or_scope.as_ref() == Some(a))
+            })
+            .collect();
+        match matching.as_slice() {
+            [] if remove.is_empty() => continue,
+            [operation] => {
+                let nevra = nevra(operation)?;
+                crate::providers::split_nevra(&nevra)?;
+                spec.args.push(nevra);
+            }
+            _ => {
+                return Err(Error::Safety(
+                    "cannot pin a DNF request to one reviewed NEVRA".into(),
+                ))
+            }
+        }
+    }
+    if spec.args.len() == template.len() - 1 {
+        return Err(Error::Safety(
+            "reviewed DNF plan has no requested target".into(),
+        ));
+    }
+    run_verified(
+        runner,
+        &backend,
+        &current,
+        &spec,
+        canceled,
+        journal,
+        guard,
+        &|operation| {
+            nevra(operation)
+                .ok()
+                .and_then(|n| crate::providers::split_nevra(&n).ok())
+                .map(|(_, _, evr)| evr)
         },
     )
 }

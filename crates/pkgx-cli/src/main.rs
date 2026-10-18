@@ -18,7 +18,7 @@ struct Cli {
     /// Print versioned JSON results (export and completions emit native text).
     #[arg(long, global = true)]
     json: bool,
-    /// Use sudo only for confirmed APT/Pacman transactions and cleanup; previews stay unprivileged.
+    /// Use sudo only for confirmed APT/Pacman/DNF transactions and cleanup; previews stay unprivileged.
     #[arg(long, global = true)]
     sudo: bool,
     /// Dedicated private transaction directory; inspection never creates it.
@@ -84,7 +84,7 @@ enum Commands {
     Why { package: String },
     /// Inspect installed native dependency expressions without resolving a graph.
     Deps { package: String },
-    /// Preview or confirm an installation (execution supports APT and Pacman).
+    /// Preview or confirm an installation (execution supports APT, Pacman and DNF).
     Install {
         package: String,
         #[arg(long)]
@@ -92,7 +92,7 @@ enum Commands {
         #[arg(long, conflicts_with = "dry_run")]
         yes: bool,
     },
-    /// Preview or confirm a removal (execution supports APT and Pacman).
+    /// Preview or confirm a removal (execution supports APT, Pacman and DNF).
     Remove {
         package: String,
         #[arg(long)]
@@ -672,7 +672,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     if !pkgx_core::execution::executable(saved.provider) {
                         return Err(pkgx_core::Error::Unsupported(
-                            "saved-plan execution supports APT and Pacman only".into(),
+                            "saved-plan execution supports APT, Pacman and DNF only".into(),
                         )
                         .into());
                     }
@@ -987,7 +987,7 @@ fn transact(
     }
     if !dry_run && !pkgx_core::execution::executable(provider) {
         return Err(pkgx_core::Error::Unsupported(format!(
-            "{provider} execution is not implemented (APT and Pacman only); no provider fallback is performed"
+            "{provider} execution is not implemented (APT, Pacman and DNF only); no provider fallback is performed"
         ))
         .into());
     }

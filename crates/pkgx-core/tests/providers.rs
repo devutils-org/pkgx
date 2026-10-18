@@ -160,13 +160,21 @@ fn unsupported_solver_never_runs_a_native_command() {
         calls: Mutex::new(vec![]),
     };
     let backend = NativeBackend {
-        provider: ProviderId::Dnf,
+        provider: ProviderId::Flatpak,
         runner: &mock,
     };
     assert!(matches!(
         backend.plan(&[parse_name(ProviderId::Pacman, "curl").unwrap()], &[]),
         Err(Error::Unsupported(_))
     ));
+    // DNF validates identities before any native command.
+    let dnf = NativeBackend {
+        provider: ProviderId::Dnf,
+        runner: &mock,
+    };
+    assert!(dnf
+        .plan(&[parse_name(ProviderId::Pacman, "curl").unwrap()], &[])
+        .is_err());
     assert!(mock.calls.lock().unwrap().is_empty());
 }
 
@@ -220,4 +228,12 @@ fn pacman_print_is_an_uncertain_preview_not_an_executable_plan() {
             &[]
         )
         .is_err());
+}
+#[test]
+fn rpm_inventory_ignores_imported_openpgp_key_headers() {
+    // Found in the disposable Fedora root after the first signed install.
+    let rows = "bash\tx86_64\t0:5.3.9-3.fc44\ngpg-pubkey\t(none)\t0:6d9f90a6-6786af3b\n";
+    let packages = pkgx_core::providers::parse_rpm(rows).unwrap();
+    assert_eq!(packages.len(), 1);
+    assert!(pkgx_core::providers::parse_rpm("other\t(none)\t0:1-1\n").is_err());
 }

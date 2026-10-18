@@ -313,7 +313,11 @@ fn providers_without_executor_and_mixed_requests_are_refused() {
         &[id("ripgrep")],
         &[],
     );
-    let dnf = parse_name(ProviderId::Dnf, "curl").unwrap();
+    let dnf = parse_name(
+        ProviderId::Flatpak,
+        "app/org.example.App/x86_64/stable:user",
+    )
+    .unwrap();
     assert!(matches!(
         apply_recorded(
             &mock,

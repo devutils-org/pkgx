@@ -68,6 +68,32 @@ files owned by the real root are not writable from the namespace, as checked
 before the run. Two bootstrap-only hooks failed inside the namespace; they are
 unrelated to the checked transactions. --sudo was not exercised.
 
+## Rootless Debian, Ubuntu and Fedora roots — 2026-10-18
+
+`tests/sandbox/debian-userns.sh` and `tests/sandbox/fedora-userns.sh` build a
+disposable Arch tool root (debootstrap + Debian/Ubuntu keyrings, or dnf5), then a
+target root on a tmpfs inside a user namespace mapping the subordinate UID range,
+with a static musl pkgx. Host package databases were never targets.
+
+- Debian bookworm (APT 2.6.1) and Ubuntu 24.04 noble: `inspection.sh`,
+  `transactions.sh` and `privilege.sh` passed — inspection, export/diff/plan,
+  confirmed install, idempotent re-apply, hold and Essential refusals, unconfirmed
+  refusal, saved manual-mark plan, stale saved plan refusal, strict-mode grant and
+  removal, and `--sudo` refusal without policy followed by delegated install/removal
+  under a NOPASSWD apt-get rule with private 0700/0600 journals. The interactive
+  PAM prompt was not exercised.
+- Fedora 44 (dnf5 5.4.1): `rpm.sh` and `dnf-transactions.sh` passed — read-only
+  checks, confirmed install with native user-installed reason, idempotent re-apply,
+  protected-package refusal, stale saved plan refusal and reviewed removal.
+
+Defects found and fixed by these runs: Debian packages named `apt`, `flatpak` or
+`dnf` were misparsed or rejected by the APT identity parser; RPM inventories broke
+after the first signed install because of `gpg-pubkey` key headers; the Debian
+root directory created by mktemp was not traversable (sandbox script). It was also
+observed that `dnf5 replay` skips OpenPGP checks for stored packages, which is why
+the DNF executor never replays (ADR 010). The scratch /tmp is nosuid, so target
+roots live on a namespace tmpfs where setuid sudo works.
+
 ## Script recipe sandbox — 2026-10-18
 
 `tests/sandbox/recipe-userns.sh target/debug/pkgx` runs `tests/sandbox/recipe-checks.sh`

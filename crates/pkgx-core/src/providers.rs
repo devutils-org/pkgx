@@ -143,6 +143,9 @@ pub fn parse_pacman(input: &str) -> Result<Vec<InstalledPackage>, Error> {
 pub fn parse_rpm(input: &str) -> Result<Vec<InstalledPackage>, Error> {
     let packages = input
         .lines()
+        // Imported OpenPGP keys appear as `gpg-pubkey` headers with no
+        // architecture; they are keyring entries, not installable packages.
+        .filter(|line| !line.starts_with("gpg-pubkey\t(none)\t"))
         .map(|line| {
             let f: Vec<_> = line.split('\t').collect();
             if f.len() != 3 || f.iter().any(|s| s.is_empty()) {
@@ -308,7 +311,13 @@ impl Backend for NativeBackend<'_> {
                 Capability::DryRun,
                 Capability::PackageCache,
             ],
-            ProviderId::Dnf => vec![Capability::Inventory, Capability::Dependencies],
+            ProviderId::Dnf => vec![
+                Capability::Inventory,
+                Capability::Install,
+                Capability::Remove,
+                Capability::Dependencies,
+                Capability::DryRun,
+            ],
             ProviderId::Flatpak => vec![Capability::Inventory],
             ProviderId::Brew => vec![
                 Capability::Inventory,
@@ -533,6 +542,9 @@ impl Backend for NativeBackend<'_> {
         })
     }
     fn plan(&self, install: &[PackageId], remove: &[PackageId]) -> Result<Plan, Error> {
+        if self.provider == ProviderId::Dnf {
+            return dnf_plan(self.runner, install, remove);
+        }
         if self.provider != ProviderId::Pacman {
             return Err(Error::Unsupported(
                 "native preview for this provider".into(),
@@ -811,4 +823,170 @@ fn pacman_policy(
         }
     }
     Ok(())
+}
+
+/// Executor-built DNF5 transactions; sudo delegation accepts only these prefixes.
+pub const DNF_INSTALL: &[&str] = &["dnf5", "install", "--assumeyes"];
+pub const DNF_REMOVE: &[&str] = &["dnf5", "remove", "--assumeyes", "--no-autoremove"];
+/// Split a DNF NEVRA (`name-[epoch:]version-release.arch`) into name, arch and the
+/// `epoch:version-release` form used by the RPM inventory.
+pub fn split_nevra(nevra: &str) -> Result<(String, String, String), Error> {
+    let invalid = || Error::Parse(format!("invalid NEVRA {nevra:?}"));
+    let (nevr, arch) = nevra.rsplit_once('.').ok_or_else(invalid)?;
+    let (nev, release) = nevr.rsplit_once('-').ok_or_else(invalid)?;
+    let (name, version) = nev.rsplit_once('-').ok_or_else(invalid)?;
+    let (epoch, version) = version.split_once(':').unwrap_or(("0", version));
+    if [name, arch, release, version, epoch]
+        .iter()
+        .any(|s| s.is_empty())
+        || !epoch.bytes().all(|b| b.is_ascii_digit())
+        || ![version, release].iter().all(|s| {
+            s.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"._+~^".contains(&b))
+        })
+    {
+        return Err(invalid());
+    }
+    parse_name(ProviderId::Dnf, &format!("{name}:{arch}"))?;
+    Ok((
+        name.into(),
+        arch.into(),
+        format!("{epoch}:{version}-{release}"),
+    ))
+}
+/// Resolve with `dnf5 --store`, which writes the resolved transaction as JSON
+/// (downloading packages into a discarded temporary directory) without running it.
+fn dnf_plan(
+    runner: &dyn CommandRunner,
+    install: &[PackageId],
+    remove: &[PackageId],
+) -> Result<Plan, Error> {
+    if install.is_empty() == remove.is_empty() {
+        return Err(Error::Unsupported(
+            "DNF preview accepts either installs or removals, not an empty or mixed transaction"
+                .into(),
+        ));
+    }
+    let requests = if remove.is_empty() { install } else { remove };
+    for id in requests {
+        validate(id)?;
+        if id.provider != ProviderId::Dnf {
+            return Err(Error::InvalidInput("provider mismatch".into()));
+        }
+    }
+    let observed = NativeBackend {
+        provider: ProviderId::Dnf,
+        runner,
+    }
+    .inventory()?;
+    let directory = tempfile::tempdir().map_err(|source| Error::Io {
+        program: "DNF preview staging".into(),
+        source,
+    })?;
+    let store = directory.path().join("transaction");
+    let template = if remove.is_empty() {
+        DNF_INSTALL
+    } else {
+        DNF_REMOVE
+    };
+    let mut spec = CommandSpec::new(template[0], &template[1..]);
+    spec.args.push(format!(
+        "--store={}",
+        store
+            .to_str()
+            .ok_or_else(|| Error::InvalidInput("temporary path is not UTF-8".into()))?
+    ));
+    for id in requests {
+        spec.args.push(match &id.architecture_or_scope {
+            Some(arch) => format!("{}.{arch}", id.name),
+            None => id.name.clone(),
+        });
+    }
+    output(runner, spec)?;
+    let json = store.join("transaction.json");
+    let mut operations = vec![];
+    let mut warnings = vec![
+        "DNF preview is a resolved dnf5 transaction stored without running it; execution re-resolves with reviewed NEVRAs pinned and verifies the result.".into(),
+        "Packages were downloaded into a temporary directory for the preview and discarded.".into(),
+    ];
+    if json.exists() {
+        use std::io::Read;
+        let mut text = String::new();
+        std::fs::File::open(&json)
+            .and_then(|f| f.take(16 * 1024 * 1024).read_to_string(&mut text))
+            .map_err(|source| Error::Io {
+                program: "DNF stored transaction".into(),
+                source,
+            })?;
+        let value: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|_| Error::Parse("invalid dnf5 transaction.json".into()))?;
+        if value.get("version").and_then(|v| v.as_str()) != Some("1.0") {
+            return Err(Error::Unsupported("dnf5 stored transaction version".into()));
+        }
+        if value
+            .as_object()
+            .is_some_and(|o| o.keys().any(|k| k != "rpms" && k != "version"))
+        {
+            return Err(Error::Unsupported(
+                "dnf5 transaction contains groups, environments or modules".into(),
+            ));
+        }
+        for rpm in value
+            .get("rpms")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| Error::Parse("dnf5 transaction lacks rpms".into()))?
+        {
+            let field = |key: &str| {
+                rpm.get(key)
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty() && !s.contains(['\t', '\n']))
+                    .ok_or_else(|| Error::Parse(format!("dnf5 rpm entry lacks {key}")))
+            };
+            let (nevra, action, reason, repo) = (
+                field("nevra")?,
+                field("action")?,
+                field("reason")?,
+                field("repo_id")?,
+            );
+            let (name, arch, _) = split_nevra(nevra)?;
+            let kind = match (action, remove.is_empty()) {
+                ("Install" | "Upgrade", true) => OperationKind::Install,
+                ("Remove", false) => OperationKind::Remove,
+                // The old side of an upgrade; verified through the new version.
+                ("Replaced", true) => continue,
+                _ => {
+                    return Err(Error::Safety(format!(
+                        "dnf5 transaction action {action:?} is not supported for this request"
+                    )))
+                }
+            };
+            if action == "Upgrade" {
+                warnings.push(format!(
+                    "{nevra} upgrades an installed package; review partial-upgrade risk."
+                ));
+            }
+            operations.push(Operation {
+                kind,
+                package: parse_name(ProviderId::Dnf, &format!("{name}:{arch}"))?,
+                risk: RiskLevel::RequiresReview,
+                native_detail: format!("{nevra}\t{action}\t{reason}\t{repo}"),
+            });
+        }
+    }
+    if operations.is_empty() {
+        if !remove.is_empty() {
+            return Err(Error::Parse("dnf5 removal produced no operations".into()));
+        }
+        warnings.push("Requested packages are already installed; nothing to do.".into());
+    }
+    if !remove.is_empty() {
+        warnings.push("Removal uses --no-autoremove: dependencies stay installed.".into());
+    }
+    Ok(Plan {
+        operations,
+        observed_state_fingerprint: crate::planner::inventory_token(&observed),
+        observed_packages: observed,
+        uncertain: true,
+        warnings,
+    })
 }

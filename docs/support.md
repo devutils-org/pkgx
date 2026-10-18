@@ -3,16 +3,18 @@
 | Environment | Local evidence | Native CI configured | Certified |
 | --- | --- | --- | --- |
 | Linux Rust stable | fmt, clippy, unit/integration fixtures | Ubuntu build/checks | No native version matrix yet |
-| Debian Bookworm / Ubuntu 24.04 APT | Injected-runner tests | Disposable inspection + transactions | Pending CI |
+| Debian Bookworm / Ubuntu 24.04 APT | Injected-runner tests + rootless debootstrap roots: inspection, transactions, strict mode, noninteractive sudo (tests/sandbox/debian-userns.sh) | Disposable inspection + transactions | Pending CI |
 | Arch Pacman | Fixtures + injected executor tests + disposable user-namespace Arch root: inspection and transactions (tests/sandbox/arch-userns.sh) | Disposable inspection + transactions | Pending CI |
-| Fedora RPM/DNF | Native-output fixture tests | Disposable inspection | Pending CI |
+| Fedora 44 RPM/DNF5 | Fixtures + injected executor tests + rootless Fedora root: inspection and transactions (tests/sandbox/fedora-userns.sh) | Disposable inspection + transactions | Pending CI |
 | Flatpak default user/system | Scoped injected-runner tests | Not yet configured | No |
 | macOS Homebrew | JSON fixture tests | macOS build + inventory smoke | Pending CI |
 | Ratatui | TestBackend + Linux pseudo-terminal demo smoke, typed confirmation, worker cancellation | Unit tests | Native execution terminal/macOS checks pending |
 | Explicit APT sudo | Injected credential/argv/order tests + harmless timeout/cancel subprocesses | Non-root disposable APT checks configured | PAM/terminal acceptance pending |
 | Script recipes | Simulated lifecycle tests + real install/uninstall in a loopback-only bubblewrap sandbox | Unit tests | No |
 
-Docker/Podman and APT are absent in the local development sandbox. Pacman 7.1.0
+Docker/Podman and APT are absent on the development host. APT and DNF evidence
+comes from rootless debootstrap/dnf5 roots built in user namespaces with the
+subordinate UID range; the host package databases were never targets. Pacman 7.1.0
 on the host was used only for read-only inventory, dependency, provenance and
 preview checks. Pacman transactions ran only inside a disposable root created by
 tests/sandbox/arch-userns.sh in an unprivileged user namespace. No native host package transaction, downloaded script or cleanup operation

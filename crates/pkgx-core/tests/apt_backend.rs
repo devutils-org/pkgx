@@ -106,7 +106,7 @@ fn selectors_and_cross_provider_inputs_are_rejected() {
         "curl?",
         "curl$()",
         "curl;id",
-        "brew:curl",
+        "apt:curl:amd64",
         "curl:amd64:extra",
         "curl:any",
         "curl:native",
@@ -116,8 +116,16 @@ fn selectors_and_cross_provider_inputs_are_rejected() {
     ] {
         assert!(apt::package_id(input).is_err(), "accepted {input:?}");
     }
+    // Found natively: Debian packages named like providers parse as packages.
+    for (input, name) in [
+        ("apt:amd64", "apt"),
+        ("flatpak:amd64", "flatpak"),
+        ("dnf", "dnf"),
+    ] {
+        assert_eq!(apt::package_id(input).unwrap().name, name);
+    }
     for input in [
-        "apt:curl:amd64",
+        "curl:amd64",
         "libstdc++6",
         "0ad",
         "python3.13",

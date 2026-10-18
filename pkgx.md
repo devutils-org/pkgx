@@ -95,10 +95,10 @@ Planning and execution are separate: backends can propose native operations; the
 - [x] Implement APT/dpkg installed inventory, search, package info and version reporting.
 - [x] Implement install/remove planning using native APT facilities; honor package holds and essential-package protections.
 - [x] Implement `pkgx list`, `search`, `info`, `install`, `remove`, `plan`, `why` (initial scope).
-- [ ] Expose native auto/manual installation reason and dependency information when available. (Implemented and fixture-tested; APT native acceptance pending.)
+- [x] Expose native auto/manual installation reason and dependency information when available. (APT manual-mark transitions verified in rootless Debian/Ubuntu roots.)
 - [x] Ensure explicit provider selection (`--provider apt`) and unambiguous defaults.
-- [ ] Integrate permission prompts only at execution time; never require root for inspection. (Explicit --sudo CLI/TUI path implemented with mocked refusal/cancellation/order checks; native PAM acceptance pending.)
-- [ ] Test against supported Debian/Ubuntu container images and negative/error cases.
+- [ ] Integrate permission prompts only at execution time; never require root for inspection. (Explicit --sudo verified natively with noninteractive sudoers policy in Debian/Ubuntu roots; interactive PAM prompt and TUI suspension pending.)
+- [x] Test against supported Debian/Ubuntu container images and negative/error cases. (Rootless Debian bookworm and Ubuntu 24.04 roots; CI containers configured.)
 
 **Acceptance**: dry-run outputs a meaningful operation list; canceling leaves state unchanged; real install/remove works in a disposable test environment; `why` clearly labels unknown provenance.
 
@@ -108,11 +108,11 @@ Planning and execution are separate: backends can propose native operations; the
 
 - [x] Version the TOML schema (`version = 1`), validate strictly, document migration policy.
 - [x] Implement `pkgx export`, `diff`, `plan -f`, `apply -f`.
-- [ ] Define additive vs strict synchronization; default to **additive** (never remove undeclared packages). (Explicit APT management grants, registry locking, strict diff/plan/apply and TUI implemented; native acceptance pending.)
+- [x] Define additive vs strict synchronization; default to **additive** (never remove undeclared packages). (Strict mode is APT-grant scoped, ADR 005; verified natively in Debian/Ubuntu roots.)
 - [x] Support platform/provider-specific sections and profile composition with deterministic precedence.
 - [x] Normalize observed state and show drift with reasons and provider attribution.
 - [x] Detect conflicts, stale plans, missing packages and unsupported operations before execution. (Fixture/simulated evidence; native CI pending.)
-- [ ] Ensure repeated apply is a no-op when desired state already matches.
+- [x] Ensure repeated apply is a no-op when desired state already matches. (Verified natively for APT, Pacman and DNF.)
 
 **Acceptance**: exported manifest can be parsed; apply is idempotent in integration tests; undeclared software is not removed by default; all destructive changes are previewed.
 
@@ -122,7 +122,7 @@ Planning and execution are separate: backends can propose native operations; the
 
 **Tasks**
 
-- [ ] Implement each provider using the same capabilities contract.
+- [ ] Implement each provider using the same capabilities contract. (APT, Pacman, DNF execute; Flatpak and Homebrew remain inspection-only.)
 - [x] Record provider-specific package identity and install scope (system/user where relevant).
 - [x] Handle ambiguous names and collisions with explicit provider qualification.
 - [ ] Test dependency/orphan semantics per backend, not via assumed universal behavior.

@@ -37,11 +37,12 @@ only explicitly granted APT identities; it refuses native cascades outside that 
 Implemented native consultation: APT, Pacman, RPM/DNF, default Flatpak user/system,
 and Homebrew formulae/casks. Identities preserve provider, architecture and scope.
 APT supports native simulation and experimental execution. Pacman supports an
-explicitly uncertain --print preview and experimental confirmed execution (ADR 007).
+explicitly uncertain --print preview and experimental confirmed execution (ADR 007);
+DNF5 previews a stored resolved transaction and executes with pinned NEVRAs (ADR 010).
 Other native solvers/executors are unsupported;
 there is no implicit provider fallback. See [backend matrix](docs/backends.md).
 
-`install`, `remove` and `apply` execute APT or Pacman only after a preview and interactive `yes`,
+`install`, `remove` and `apply` execute APT, Pacman or DNF only after a preview and interactive `yes`,
 or explicit --yes. Noninteractive execution without --yes is refused. Revalidation
 follows confirmation. Execution requires native privileges; explicit --sudo can
 delegate the reviewed APT/Pacman transaction without elevating inspection or pkgx state.
@@ -88,7 +89,8 @@ Tests use fixtures, injected runners, temporary storage, harmless utilities and 
 Ratatui TestBackend. Docker/Podman and APT are unavailable locally. Pacman 7.1.0 is checked
 read-only on the host; Pacman transactions and cleanup ran only in a disposable
 user-namespace Arch root, and recipe install/uninstall only in a loopback-only sandbox.
-Debian/Ubuntu transaction CI and macOS native validation remain pending. No host package
+APT (Debian bookworm, Ubuntu 24.04) and DNF5 (Fedora 44) transactions ran in rootless
+disposable roots. Configured CI runs and macOS native validation remain pending. No host package
 transaction, cleanup or installation script has run. See [validation status](docs/support.md) and [local results](docs/validation.md),
 [manifest reference](docs/manifest.md), [recipe preparation](docs/recipes.md),
 [failure/recovery](docs/recovery.md), [roadmap](pkgx.md) and [current scope](docs/continuation-plan.md).

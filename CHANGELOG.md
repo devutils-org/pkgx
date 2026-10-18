@@ -10,6 +10,11 @@
 - Add a disposable user-namespace Arch root for native Pacman validation.
 - Add tracked script install/uninstall with trust confirmation, home-relative
   ownership checks, private receipts and recorded uninstall actions (ADR 008).
+- Add experimental DNF5 execution: stored-transaction previews, NEVRA-pinned
+  execution with repository signature checks, verification and sudo (ADR 010).
+- Fix APT parsing of Debian packages named like providers (`apt`, `flatpak`, `dnf`)
+  and RPM inventories containing imported `gpg-pubkey` headers.
+- Add rootless debootstrap (Debian/Ubuntu) and Fedora roots for native validation.
 - Classify audit findings as safe native cleanup, suggested cleanup or manual review;
   measure APT/Pacman caches; add confirmed `clean --cache` and reviewed
   `clean --orphans` (ADR 009). Pacman now advertises install/remove capabilities.

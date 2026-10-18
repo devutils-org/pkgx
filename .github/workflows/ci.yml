@@ -45,7 +45,7 @@ jobs:
           - image: archlinux:base
             check: pacman -Sy --noconfirm && sh /checks/pacman.sh && sh /checks/pacman-transactions.sh
           - image: fedora:latest
-            check: sh /checks/rpm.sh
+            check: sh /checks/rpm.sh && sh /checks/dnf-transactions.sh
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

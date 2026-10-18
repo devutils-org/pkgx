@@ -15,6 +15,7 @@ use std::{
 pub const SUDO: &str = "/usr/bin/sudo";
 pub const APT: &str = "/usr/bin/apt-get";
 pub const PACMAN: &str = "/usr/bin/pacman";
+pub const DNF: &str = "/usr/bin/dnf5";
 pub trait SudoAuthenticator {
     fn authenticate(&self, canceled: &AtomicBool) -> Result<(), Error>;
 }
@@ -81,13 +82,14 @@ impl CommandRunner for SudoAptRunner<'_> {
                 APT
             }
             "apt-get" if crate::cache::sudo_template("apt-get", &spec.args) => APT,
+            "dnf5" if dnf_transaction(&spec.args) => DNF,
             "pacman"
                 if pacman_transaction(&spec.args)
                     || crate::cache::sudo_template("pacman", &spec.args) =>
             {
                 PACMAN
             }
-            _ => return Err(Error::Safety("sudo delegation accepts only an executor-marked APT or Pacman transaction or cache cleanup with no environment overrides".into())),
+            _ => return Err(Error::Safety("sudo delegation accepts only an executor-marked APT, Pacman or DNF transaction or cache cleanup with no environment overrides".into())),
         };
         let mut elevated = CommandSpec::new(SUDO, &["-n", "-u", "root", "--", program]);
         elevated.args.extend(spec.args.iter().cloned());
@@ -96,6 +98,18 @@ impl CommandRunner for SudoAptRunner<'_> {
     }
 }
 
+fn dnf_transaction(args: &[String]) -> bool {
+    [crate::providers::DNF_INSTALL, crate::providers::DNF_REMOVE]
+        .iter()
+        .any(|template| {
+            let prefix = &template[1..];
+            args.len() > prefix.len()
+                && args.iter().zip(prefix.iter()).all(|(a, b)| a == b)
+                && args[prefix.len()..]
+                    .iter()
+                    .all(|t| crate::providers::split_nevra(t).is_ok())
+        })
+}
 /// Exactly an executor template followed by non-option targets.
 fn pacman_transaction(args: &[String]) -> bool {
     [
@@ -190,6 +204,7 @@ fn verify_environment(provider: crate::ProviderId) -> Result<(), Error> {
             &["APT_CONFIG", "DPKG_ROOT", "DPKG_ADMINDIR"],
         ),
         crate::ProviderId::Pacman => ("pacman", PACMAN, &[]),
+        crate::ProviderId::Dnf => ("dnf5", DNF, &[]),
         _ => {
             return Err(Error::Unsupported(format!(
                 "sudo delegation for {provider}"

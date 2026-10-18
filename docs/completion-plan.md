@@ -6,18 +6,18 @@ There is no percentage-based substitute for those checks.
 
 Current sequence:
 
-1. Expose installed native dependency expressions through a common backend
-   contract, CLI and TUI. Preserve alternatives/constraints and distinguish
-   metadata from resolved dependency edges. Test with injected runners.
-2. Complete local distribution tooling: versioned platform archives, checksums,
-   installation guide and artifact verification. Do not publish automatically.
-3. Advance the remaining ownership/receipt and native execution features only
-   behind their existing confirmation and state-revalidation requirements.
-4. Run the disposable Linux/macOS acceptance matrix where available; report
-   missing runners explicitly. Never install/remove host packages for validation.
+1. Done: Pacman executor (ADR 007), tracked script receipts (ADR 008) and
+   conservative cleanup classes/execution (ADR 009), each with injected tests and
+   disposable-root evidence (docs/validation.md).
+2. Native APT acceptance in a rootless debootstrap root
+   (tests/sandbox/debian-userns.sh), then the same scripts in configured CI.
+3. Remaining executors in roadmap order (DNF, Flatpak, Homebrew) only with a native
+   preview that can be revalidated; otherwise they stay unsupported.
+4. Release qualification: signing, multi-platform artifact runs and macOS smoke.
+   Never install/remove host packages for validation.
 
 Strict synchronization now requires explicit APT management grants, a locked
 registry snapshot and native removal scope checks (ADR 005). Ungranted identities
-remain outside its authority. Script recipes remain data until
-an execution/receipt design satisfies the product's ownership rules. Unavailable
+remain outside its authority. Script recipes execute only through
+the receipt design in ADR 008. Unavailable
 native features stay unsupported rather than being silently substituted.

@@ -101,16 +101,9 @@ pub struct AptBackend<'a> {
 
 /// Accept only Debian binary package names and optional concrete architecture.
 /// APT's option/regex/version/release/action selector syntax is intentionally excluded.
+/// Parse a native `name[:arch]` identity. Provider prefixes are handled by
+/// `PackageId::from_str`; `apt`, `flatpak` or `dnf` here are Debian package names.
 pub fn package_id(input: &str) -> Result<PackageId, Error> {
-    if ["brew:", "pacman:", "dnf:", "flatpak:", "script:"]
-        .iter()
-        .any(|prefix| input.starts_with(prefix))
-    {
-        return Err(Error::InvalidInput(
-            "APT cannot handle another provider".into(),
-        ));
-    }
-    let input = input.strip_prefix("apt:").unwrap_or(input);
     let mut parts = input.split(':');
     let name = parts.next().unwrap_or_default();
     let arch = parts.next();
