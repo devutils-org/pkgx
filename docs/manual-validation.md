@@ -1,5 +1,7 @@
 # Validation manuelle restante
 
+Pour un parcours complet de toutes les fonctionnalités, voir [how-to-test.md](how-to-test.md).
+
 Checklist des vérifications qui ne peuvent pas être faites depuis l'environnement de
 développement Linux. Chaque scénario qui modifie des paquets tourne dans un
 environnement **jetable** (runner CI, machine OrbStack, VM Tart), jamais sur le Mac

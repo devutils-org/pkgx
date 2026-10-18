@@ -60,6 +60,7 @@ cargo test --workspace
 ```
 
 Use disposable environments for native transactions; see [validation](docs/validation.md).
+To try every feature by hand, follow the [testing guide](docs/how-to-test.md) (French).
 
 ## License
 

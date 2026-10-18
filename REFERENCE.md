@@ -125,7 +125,7 @@ disposable roots. The CI matrix passed (GitHub Actions run 39143547380), includi
 transactions and managed files on a disposable macOS runner. No host package
 transaction, cleanup or installation script has run. See [validation status](docs/support.md) and [local results](docs/validation.md),
 [manifest reference](docs/manifest.md), [recipe preparation](docs/recipes.md),
-[failure/recovery](docs/recovery.md), [roadmap](pkgx.md) and [current scope](docs/continuation-plan.md).
+[failure/recovery](docs/recovery.md), [roadmap](pkgx.md), [current scope](docs/continuation-plan.md) and the hands-on [testing guide](docs/how-to-test.md) (French).
 
 In the TUI, Tab cycles through all loaded providers, including providers with an
 empty inventory, then returns to the combined view. The text filter is preserved.
