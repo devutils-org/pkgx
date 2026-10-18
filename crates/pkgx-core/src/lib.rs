@@ -1,6 +1,7 @@
 pub mod apt;
 pub mod audit;
 pub mod backend;
+pub mod cache;
 pub mod catalog;
 pub mod command;
 pub mod dependency;
@@ -65,6 +66,8 @@ pub enum Capability {
     Orphans,
     DryRun,
     ConfigInspection,
+    /// Native package cache measurement and confirmed native cleanup.
+    PackageCache,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

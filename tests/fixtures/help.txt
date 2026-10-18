@@ -17,8 +17,8 @@ Commands:
   diff         Report provider-scoped manifest drift without changing packages
   apply        Reconcile an additive manifest after plan review and confirmation
   tui          Open the package browser (read-only unless --allow-apply)
-  audit        Inspect native orphan suggestions; never delete paths or packages
-  clean        Preview cleanup findings; execution is deliberately unsupported
+  audit        Inspect native orphans, caches and residual records; never deletes anything
+  clean        Preview cleanup, or run native cache cleanup / reviewed orphan removal
   recipe       Check, verify, install and track script recipes (explicit trust required)
   completions  Print Bash, Zsh or Fish completion definitions
   history      Read transaction records; missing results are running or unknown
@@ -29,7 +29,7 @@ Commands:
 
 Options:
       --json                   Print versioned JSON results (export and completions emit native text)
-      --sudo                   Use sudo only for confirmed APT/Pacman execution; previews stay unprivileged
+      --sudo                   Use sudo only for confirmed APT/Pacman transactions and cleanup; previews stay unprivileged
       --state-dir <STATE_DIR>  Dedicated private transaction directory; inspection never creates it
       --profile <PROFILE>      Select a manifest profile; repeat to compose several profiles
   -h, --help                   Print help

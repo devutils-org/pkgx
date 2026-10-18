@@ -39,9 +39,12 @@ replay scripts or assume that a matching inventory proves a transaction succeede
 untouched inventory are also reported as verification failures.
 A nonzero native exit remains a failure even when planned identities are present.
 
-Audit/clean only preview native orphan candidates. They never delete cache files,
-residual configurations, home data, unknown paths or shared resources. Disk-space
-estimates remain unknown; a native orphan mark is not sufficient removal authority.
+Audit and clean --dry-run only preview. `clean --cache` runs the native cache
+command and verifies the cache shrank; a failure leaves whatever the native command
+left and is journaled. `clean --orphans` is an ordinary reviewed removal: recover as
+for any native transaction. Residual configurations, home data, unknown paths and
+shared resources are never deleted. A native orphan mark is not removal authority
+by itself; confirmation is required for every orphan removal.
 
 Saved package plans use `plan apt:package --save preview.json --expires-in 300` and
 `apply --plan preview.json`. The review lifetime cannot exceed one hour. Expired,

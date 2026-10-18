@@ -49,9 +49,11 @@ A private transaction journal records intent and verified results. Saved plans e
 and must match a fresh native plan before execution; see [saved-plan policy](docs/adr/004-saved-plan-review.md). SIGINT/SIGTERM
 cancels subprocess work on Unix. Partial failures never imply rollback.
 
-Audit/clean are read-only previews. They do not delete cache files, configurations,
-home data or unmanaged paths. Native orphans and dpkg residual-configuration records require user review; estimated
-space is unknown. The Ratatui frontend supports filtering, info, provenance, orphan inspection and
+Audit and `clean --dry-run` classify findings as safe native cleanup (measured APT/Pacman
+package caches), suggested cleanup (native orphans) and manual review (dpkg residual
+records). `clean --cache` runs only `apt-get clean`/`pacman -Sc` after confirmation;
+`clean --orphans` sends orphan candidates through the reviewed removal executor
+(ADR 009). pkgx never deletes configurations, home data or unmanaged paths itself. The Ratatui frontend supports filtering, info, provenance, orphan inspection and
 plan review. It is read-only by default. `tui --allow-apply` enables experimental
 APT operations after pressing x and typing apply, with core revalidation, journal
 and cancellable worker progress.
@@ -83,10 +85,11 @@ cargo build --release --locked -p pkgx-cli
 ```
 
 Tests use fixtures, injected runners, temporary storage, harmless utilities and a
-Ratatui TestBackend. Docker/Podman and APT are unavailable locally. Pacman 7.1.0 inventory, dependencies
-and provenance have been checked in read-only native smoke tests. Disposable
-transaction CI and macOS native validation remain pending. No host package transaction,
-cleanup or installation script has run. See [validation status](docs/support.md) and [local results](docs/validation.md),
+Ratatui TestBackend. Docker/Podman and APT are unavailable locally. Pacman 7.1.0 is checked
+read-only on the host; Pacman transactions and cleanup ran only in a disposable
+user-namespace Arch root, and recipe install/uninstall only in a loopback-only sandbox.
+Debian/Ubuntu transaction CI and macOS native validation remain pending. No host package
+transaction, cleanup or installation script has run. See [validation status](docs/support.md) and [local results](docs/validation.md),
 [manifest reference](docs/manifest.md), [recipe preparation](docs/recipes.md),
 [failure/recovery](docs/recovery.md), [roadmap](pkgx.md) and [current scope](docs/continuation-plan.md).
 

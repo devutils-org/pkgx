@@ -222,6 +222,7 @@ impl Backend for AptBackend<'_> {
             Capability::DryRun,
             Capability::Orphans,
             Capability::ConfigInspection,
+            Capability::PackageCache,
         ]
     }
     fn inventory(&self) -> Result<Vec<InstalledPackage>, Error> {
@@ -313,6 +314,9 @@ impl Backend for AptBackend<'_> {
             ),
         )?;
         parse_residual_configurations(&records)
+    }
+    fn package_cache(&self) -> Result<crate::cache::CacheReport, Error> {
+        crate::cache::measure(self.runner, ProviderId::Apt)
     }
     fn orphan_candidates(&self) -> Result<Vec<PackageId>, Error> {
         let simulation = text(

@@ -6,7 +6,8 @@
 # The host package database is never a target: pacman is always given an
 # explicit --root/--dbpath/--cachedir under WORKDIR, host files owned by the real
 # root are not writable from the namespace, and checks run with WORKDIR/root
-# bound as /. Only public keyring material is copied. Requires bwrap, network
+# bound as /. Only public keyring material is copied. The root is removed
+# afterwards unless KEEP_ROOT=1; WORKDIR/cache keeps downloaded packages. Requires bwrap, network
 # access to the configured mirrors and an Arch host pacman.
 set -eu
 WORK=${1:?usage: arch-userns.sh WORKDIR PKGX_BINARY [CHECK...]}
@@ -59,4 +60,11 @@ for check in "${@:-pacman.sh pacman-transactions.sh}"; do
         in_root sh "/checks/$script"
     done
 done
-echo "disposable root: $ROOT"
+if [ "${KEEP_ROOT:-0}" = 1 ]; then
+    echo "disposable root kept: $ROOT"
+else
+    # Packages install some read-only directories; they belong to this user.
+    chmod -R u+w "$ROOT"
+    rm -rf "$ROOT"
+    echo 'disposable root removed'
+fi

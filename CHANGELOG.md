@@ -10,6 +10,9 @@
 - Add a disposable user-namespace Arch root for native Pacman validation.
 - Add tracked script install/uninstall with trust confirmation, home-relative
   ownership checks, private receipts and recorded uninstall actions (ADR 008).
+- Classify audit findings as safe native cleanup, suggested cleanup or manual review;
+  measure APT/Pacman caches; add confirmed `clean --cache` and reviewed
+  `clean --orphans` (ADR 009). Pacman now advertises install/remove capabilities.
 
 - Initialize Rust workspace, package identity and plan models.
 - Add controlled subprocess runner and provider binary diagnostics.

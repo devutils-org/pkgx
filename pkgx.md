@@ -150,10 +150,10 @@ Planning and execution are separate: backends can propose native operations; the
 **Tasks**
 
 - [x] Implement `pkgx audit`, `doctor`, `clean --dry-run`.
-- [ ] Detect native package-manager orphans and caches through native APIs/commands.
+- [x] Detect native package-manager orphans and caches through native APIs/commands. (APT/Pacman caches; Brew/DNF/Flatpak caches unsupported.)
 - [x] Identify residual configuration only where attribution is reliable. (dpkg package records only; paths/ownership not inferred.)
 - [x] Present risk, provenance, estimated reclaimable space, and confidence for each finding.
-- [ ] Separate safe native cleanup, suggested cleanup, and advanced manual review.
+- [x] Separate safe native cleanup, suggested cleanup, and advanced manual review. (ADR 009.)
 - [x] Keep user home data, system-critical packages, unknown files, and shared resources protected by default.
 - [x] Record before/after transaction results; report partial failures accurately.
 
@@ -288,9 +288,10 @@ preview is an uncertain native --print estimate; Pacman has an experimental
 executor (ADR 007) validated in a disposable user-namespace Arch root.
 M4 has strict recipe check, HTTPS/SHA-256 preparation and confirmed home-scoped
 install/uninstall with receipts (ADR 008), validated in a loopback-only sandbox;
-experimental observation of undeclared effects is not implemented. M5 has native orphan audit previews
-and read-only clean, plus native residual-configuration record inspection;
-caches/residual-config removal remains unsupported. M6 has
+experimental observation of undeclared effects is not implemented. M5 classifies safe native cleanup (measured
+APT/Pacman caches), suggested cleanup (orphans) and manual review (residual records);
+confirmed native cache cleanup and reviewed orphan removal exist (ADR 009);
+residual-configuration purge remains unsupported. M6 has
 a Ratatui browser with details/provenance/orphans/plans, read-only by default,
 with opt-in typed APT confirmation and cancellable worker execution. M7 has expanded
 regressions, recovery/security documentation, completion definitions and a manual

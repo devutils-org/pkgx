@@ -18,7 +18,7 @@ struct Cli {
     /// Print versioned JSON results (export and completions emit native text).
     #[arg(long, global = true)]
     json: bool,
-    /// Use sudo only for confirmed APT/Pacman execution; previews stay unprivileged.
+    /// Use sudo only for confirmed APT/Pacman transactions and cleanup; previews stay unprivileged.
     #[arg(long, global = true)]
     sudo: bool,
     /// Dedicated private transaction directory; inspection never creates it.
@@ -158,15 +158,23 @@ enum Commands {
         #[arg(short = 'f', long)]
         file: Option<PathBuf>,
     },
-    /// Inspect native orphan suggestions; never delete paths or packages.
+    /// Inspect native orphans, caches and residual records; never deletes anything.
     Audit {
         #[arg(long, value_enum, default_value = "apt")]
         provider: Vec<InventoryProvider>,
     },
-    /// Preview cleanup findings; execution is deliberately unsupported.
+    /// Preview cleanup, or run native cache cleanup / reviewed orphan removal.
     Clean {
-        #[arg(long, required = true)]
+        #[arg(long, required_unless_present_any = ["cache", "orphans"])]
         dry_run: bool,
+        /// Clean the native package cache with the provider's own command.
+        #[arg(long, conflicts_with = "orphans")]
+        cache: bool,
+        /// Remove native orphan candidates through a reviewed native transaction.
+        #[arg(long)]
+        orphans: bool,
+        #[arg(long, conflicts_with = "dry_run")]
+        yes: bool,
         #[arg(long, value_enum, default_value = "apt")]
         provider: Vec<InventoryProvider>,
     },
@@ -264,13 +272,14 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             Commands::Install { .. }
                 | Commands::Remove { .. }
                 | Commands::Apply { .. }
+                | Commands::Clean { dry_run: false, .. }
                 | Commands::Tui {
                     allow_apply: true,
                     ..
                 }
         )
     {
-        return Err(pkgx_core::Error::InvalidInput("--sudo supports install, remove, apply and tui --allow-apply only; inspection is never elevated".into()).into());
+        return Err(pkgx_core::Error::InvalidInput("--sudo supports install, remove, apply, clean and tui --allow-apply only; inspection is never elevated".into()).into());
     }
     let runner = session::Session::new(cli.sudo)?;
     let journal = || state_directory(cli.state_dir.clone()).map(pkgx_core::journal::Journal::new);
@@ -407,6 +416,71 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 allow_apply,
                 cli.state_dir.clone(),
             )?;
+        }
+        Commands::Clean {
+            dry_run,
+            cache,
+            orphans,
+            yes,
+            provider,
+        } if cache || orphans => {
+            let [provider] = provider.as_slice() else {
+                return Err(pkgx_core::Error::InvalidInput(
+                    "cleanup execution targets exactly one --provider".into(),
+                )
+                .into());
+            };
+            let provider = ProviderId::from(provider.clone());
+            let backend = providers::backend(provider, &runner, std::env::consts::OS)?;
+            if orphans {
+                let candidates = backend.orphan_candidates()?;
+                if candidates.is_empty() {
+                    display(
+                        &serde_json::json!({"operations":[],"success":true,"verified":true}),
+                        cli.json,
+                    )?;
+                    return Ok(());
+                }
+                drop(backend);
+                transact(&runner, &[], &candidates, dry_run, yes, cli.json, &journal)?;
+                return Ok(());
+            }
+            let report = backend.package_cache()?;
+            if dry_run {
+                display(&pkgx_core::cache::plan(&report), cli.json)?;
+                return Ok(());
+            }
+            eprintln!("{}", output::human(&pkgx_core::cache::plan(&report))?);
+            confirm_action(
+                &runner,
+                yes,
+                &format!("Run native {provider} cache cleanup? Type yes: "),
+            )?;
+            let use_sudo = runner.sudo_requested && report.files > 0;
+            if use_sudo {
+                pkgx_core::privilege::SudoAuthenticator::authenticate(
+                    &pkgx_core::privilege::ProcessSudoAuthenticator { provider },
+                    &runner.canceled,
+                )?;
+            }
+            let elevated = pkgx_core::privilege::SudoAptRunner::new(&runner);
+            let execution_runner: &dyn pkgx_core::command::CommandRunner =
+                if use_sudo { &elevated } else { &runner };
+            let record = pkgx_core::cache::clean(
+                execution_runner,
+                &report,
+                true,
+                &runner.canceled,
+                Some(&journal()?),
+            )?;
+            let success = record.success;
+            display(&record, cli.json)?;
+            if !success {
+                return Err(pkgx_core::Error::Safety(
+                    "native cache cleanup failed or was not verified".into(),
+                )
+                .into());
+            }
         }
         Commands::Audit { provider } | Commands::Clean { provider, .. } => {
             let mut selected: Vec<ProviderId> = provider.into_iter().map(Into::into).collect();

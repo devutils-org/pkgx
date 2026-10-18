@@ -301,9 +301,12 @@ impl Backend for NativeBackend<'_> {
             ProviderId::Pacman => vec![
                 Capability::Inventory,
                 Capability::Search,
+                Capability::Install,
+                Capability::Remove,
                 Capability::Dependencies,
                 Capability::Orphans,
                 Capability::DryRun,
+                Capability::PackageCache,
             ],
             ProviderId::Dnf => vec![Capability::Inventory, Capability::Dependencies],
             ProviderId::Flatpak => vec![Capability::Inventory],
@@ -622,6 +625,9 @@ impl Backend for NativeBackend<'_> {
             uncertain: true,
             warnings,
         })
+    }
+    fn package_cache(&self) -> Result<crate::cache::CacheReport, Error> {
+        crate::cache::measure(self.runner, self.provider)
     }
     fn orphan_candidates(&self) -> Result<Vec<PackageId>, Error> {
         let names = match self.provider {

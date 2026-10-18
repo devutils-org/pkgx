@@ -80,8 +80,14 @@ impl CommandRunner for SudoAptRunner<'_> {
             {
                 APT
             }
-            "pacman" if pacman_transaction(&spec.args) => PACMAN,
-            _ => return Err(Error::Safety("sudo delegation accepts only an executor-marked APT or Pacman transaction with no environment overrides".into())),
+            "apt-get" if crate::cache::sudo_template("apt-get", &spec.args) => APT,
+            "pacman"
+                if pacman_transaction(&spec.args)
+                    || crate::cache::sudo_template("pacman", &spec.args) =>
+            {
+                PACMAN
+            }
+            _ => return Err(Error::Safety("sudo delegation accepts only an executor-marked APT or Pacman transaction or cache cleanup with no environment overrides".into())),
         };
         let mut elevated = CommandSpec::new(SUDO, &["-n", "-u", "root", "--", program]);
         elevated.args.extend(spec.args.iter().cloned());

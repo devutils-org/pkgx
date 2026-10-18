@@ -50,6 +50,21 @@ pkgx apply --plan /tmp/review.json --yes --state-dir /tmp/pkgx-records --json
 ! installed sl || fail 'reviewed removal left the package installed'
 installed ncurses || fail 'removal cascaded into a dependency'
 pkgx remove pacman:figlet --yes --json
+# Suggested cleanup: a dependency-marked leaf is removed only through review.
+pacman -S --noconfirm --asdeps figlet
+pkgx audit --provider pacman --json | grep -q '"category":"suggested_cleanup"'
+pkgx clean --orphans --provider pacman --dry-run --json | grep -q figlet
+if printf 'no\n' | pkgx clean --orphans --provider pacman; then
+    fail 'unconfirmed orphan cleanup unexpectedly ran'
+fi
+installed figlet
+pkgx clean --orphans --provider pacman --yes --state-dir /tmp/pkgx-records --json
+! installed figlet || fail 'orphan cleanup left the package'
+installed bash
+# Safe native cleanup through pacman -Sc only.
+pkgx clean --cache --provider pacman --dry-run --json
+pkgx clean --cache --provider pacman --yes --state-dir /tmp/pkgx-records --json > /tmp/cache.json
+grep -q '"success":true' /tmp/cache.json
 pkgx history --state-dir /tmp/pkgx-records --json > /tmp/history.json
-grep -q '"success":true' /tmp/history.json
+[ "$(grep -o '"success":true' /tmp/history.json | wc -l)" -ge 4 ] || fail 'journal is missing results'
 pkgx doctor --state-dir /tmp/pkgx-records --json

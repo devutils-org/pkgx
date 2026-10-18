@@ -54,7 +54,11 @@ unprivileged user namespace. Both passed (exit 0):
   policy path is covered by injected-runner tests);
 - a saved removal plan invalidated by an inventory change was refused;
 - a fresh saved removal plan removed `sl` without cascading into `ncurses`;
-- history and doctor reported two successful journaled transactions.
+- an `--asdeps` package was reported as `suggested_cleanup`, an unconfirmed
+  `clean --orphans` was refused, and a confirmed one removed it without touching bash;
+- `clean --cache` ran `pacman -Sc` and verified the cache shrank;
+- history and doctor reported the journaled transactions with successful results;
+- the disposable root was removed afterwards (packages stay in WORKDIR/cache).
 
 The first run found a real defect: `export` of a Pacman inventory produced a
 manifest that `diff`/`plan` rejected because the `pacman` package looked like a

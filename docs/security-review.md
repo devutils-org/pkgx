@@ -36,8 +36,9 @@ Implemented controls and regression evidence:
   interpreter. Receipts claim only resources created by the install; uninstall is
   refused when owned files changed and pkgx itself never deletes resource paths.
   Scripts are not confined: undeclared side effects run with user permissions.
-- Audit never traverses arbitrary data paths, purges configurations or executes
-  native cleanup.
+- Audit reads only native cache directories reported by the package manager and
+  never traverses arbitrary data paths or purges configurations. Cleanup runs only
+  the exact native cache commands or the reviewed removal executor (ADR 009).
 - TUI mutation is off by default. Enabling it still requires a reviewed nonempty APT
   plan and exact typed confirmation. A worker reuses core revalidation/journaling.
   Terminal/event errors request cancellation before a worker is joined.

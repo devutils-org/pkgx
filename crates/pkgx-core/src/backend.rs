@@ -42,6 +42,9 @@ pub trait Backend {
     fn residual_configurations(&self) -> Result<Vec<PackageId>, Error> {
         Err(Error::Unsupported("residual configuration query".into()))
     }
+    fn package_cache(&self) -> Result<crate::cache::CacheReport, Error> {
+        Err(Error::Unsupported("package cache inspection".into()))
+    }
     fn orphan_candidates(&self) -> Result<Vec<PackageId>, Error> {
         Err(Error::Unsupported("orphan query".into()))
     }

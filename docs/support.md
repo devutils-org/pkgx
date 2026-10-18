@@ -16,7 +16,7 @@ Docker/Podman and APT are absent in the local development sandbox. Pacman 7.1.0
 on the host was used only for read-only inventory, dependency, provenance and
 preview checks. Pacman transactions ran only inside a disposable root created by
 tests/sandbox/arch-userns.sh in an unprivileged user namespace. No native host package transaction, downloaded script or cleanup operation
-has been run. Configuring CI does not count as a successful CI run.
+has been run on the host. Configuring CI does not count as a successful CI run.
 
 Build locally using Rust stable: `cargo build --release --locked -p pkgx-cli`.
 Run fmt, workspace clippy with -D warnings and workspace tests before changes are
