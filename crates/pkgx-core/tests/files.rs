@@ -238,3 +238,200 @@ fn registry_reads_fail_closed_and_never_create_state() {
     );
     assert!(matches!(registry.read(), Err(Error::Safety(_))));
 }
+
+struct Fixture {
+    repo: tempfile::TempDir,
+    home: tempfile::TempDir,
+    state: tempfile::TempDir,
+}
+impl Fixture {
+    fn new() -> Self {
+        Self {
+            repo: tempfile::tempdir().unwrap(),
+            home: tempfile::tempdir().unwrap(),
+            state: tempfile::tempdir().unwrap(),
+        }
+    }
+    fn registry(&self) -> FileRegistry {
+        FileRegistry::new(self.state.path().join("files"))
+    }
+    fn sources(&self, manifest_text: &str) -> Vec<files::LoadedSource> {
+        files::load_sources(self.repo.path(), &manifest(manifest_text).files).unwrap()
+    }
+    fn plan(&self, manifest_text: &str) -> Result<files::FilePlan, Error> {
+        files::plan(
+            self.home.path(),
+            &self.sources(manifest_text),
+            &self.registry().read().unwrap(),
+        )
+    }
+    fn apply(&self, manifest_text: &str, plan: &files::FilePlan) -> Result<(), Error> {
+        let registry = self.registry();
+        let mut guard = registry.lock(&registry.read().unwrap()).unwrap();
+        files::apply(
+            self.home.path(),
+            &self.sources(manifest_text),
+            plan,
+            &mut guard,
+        )
+        .map(|_| ())
+    }
+}
+const TMUX: &str =
+    "version = 1\n[files.\"~/.config/tmux/tmux.conf\"]\nsource = \"tmux.conf\"\nmode = \"0644\"\n";
+
+#[test]
+fn apply_creates_files_with_private_parents_and_records_receipts() {
+    let f = Fixture::new();
+    fs::write(f.repo.path().join("tmux.conf"), "set -g mouse on\n").unwrap();
+    let plan = f.plan(TMUX).unwrap();
+    assert_eq!(plan.writes.len(), 1);
+    assert!(plan.writes[0].diff.contains("+set -g mouse on"));
+    f.apply(TMUX, &plan).unwrap();
+    let target = f.home.path().join(".config/tmux/tmux.conf");
+    assert_eq!(fs::read_to_string(&target).unwrap(), "set -g mouse on\n");
+    assert_eq!(
+        fs::metadata(&target).unwrap().permissions().mode() & 0o7777,
+        0o644
+    );
+    for dir in [".config", ".config/tmux"] {
+        let mode = fs::metadata(f.home.path().join(dir))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o700, "{dir}");
+    }
+    let receipts = f.registry().read().unwrap();
+    assert_eq!(receipts.files[0].sha256, digest(b"set -g mouse on\n"));
+    assert!(f.plan(TMUX).unwrap().writes.is_empty());
+    assert!(!f.state.path().join("files/lock").exists());
+
+    fs::write(f.repo.path().join("tmux.conf"), "set -g mouse off\n").unwrap();
+    let update = f.plan(TMUX).unwrap();
+    assert!(update.writes[0].diff.contains("-set -g mouse on"));
+    f.apply(TMUX, &update).unwrap();
+    assert_eq!(fs::read_to_string(&target).unwrap(), "set -g mouse off\n");
+}
+
+#[test]
+fn conflicts_block_the_whole_plan() {
+    let f = Fixture::new();
+    fs::write(f.repo.path().join("tmux.conf"), "x").unwrap();
+    write(&f.home.path().join(".config/tmux/tmux.conf"), b"x", 0o644);
+    let error = f.plan(TMUX).unwrap_err().to_string();
+    assert!(
+        error.contains("~/.config/tmux/tmux.conf (unmanaged_conflict)"),
+        "{error}"
+    );
+}
+
+#[test]
+fn apply_refuses_targets_or_sources_changed_after_review() {
+    let f = Fixture::new();
+    fs::write(f.repo.path().join("tmux.conf"), "declared\n").unwrap();
+    let target = f.home.path().join(".config/tmux/tmux.conf");
+
+    let plan = f.plan(TMUX).unwrap();
+    write(&target, b"created meanwhile\n", 0o644);
+    assert!(matches!(f.apply(TMUX, &plan), Err(Error::Safety(_))));
+    assert_eq!(fs::read_to_string(&target).unwrap(), "created meanwhile\n");
+    fs::remove_file(&target).unwrap();
+
+    let outside = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(outside.path().join("victim"), &target).unwrap();
+    assert!(matches!(f.apply(TMUX, &plan), Err(Error::Safety(_))));
+    assert!(!outside.path().join("victim").exists());
+    fs::remove_file(&target).unwrap();
+    fs::remove_dir(target.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(outside.path(), target.parent().unwrap()).unwrap();
+    assert!(matches!(f.apply(TMUX, &plan), Err(Error::Safety(_))));
+    assert!(fs::read_dir(outside.path()).unwrap().next().is_none());
+    fs::remove_file(target.parent().unwrap()).unwrap();
+
+    let reviewed = f.plan(TMUX).unwrap();
+    fs::write(f.repo.path().join("tmux.conf"), "edited after review\n").unwrap();
+    assert!(matches!(f.apply(TMUX, &reviewed), Err(Error::Safety(_))));
+    assert!(!target.exists());
+    assert!(f.registry().read().unwrap().files.is_empty());
+}
+
+#[test]
+fn adoption_backs_up_content_and_enables_replacement() {
+    let f = Fixture::new();
+    fs::write(f.repo.path().join("tmux.conf"), "declared\n").unwrap();
+    let target = f.home.path().join(".config/tmux/tmux.conf");
+    write(&target, b"handwritten\n", 0o664);
+    let registry = f.registry();
+    let preview = files::preview_adoption(
+        f.home.path(),
+        "~/.config/tmux/tmux.conf",
+        &registry.read().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(preview.mode, "0664");
+    {
+        let mut guard = registry.lock(&registry.read().unwrap()).unwrap();
+        assert!(matches!(
+            registry.lock(&registry.read().unwrap()),
+            Err(Error::Safety(_))
+        ));
+        files::adopt(f.home.path(), &preview, &mut guard).unwrap();
+    }
+    let backup = f
+        .state
+        .path()
+        .join("files/backups")
+        .join(digest(b"handwritten\n"));
+    assert_eq!(fs::read(&backup).unwrap(), b"handwritten\n");
+    assert_eq!(
+        fs::metadata(&backup).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert_eq!(fs::read(&target).unwrap(), b"handwritten\n");
+    let plan = f.plan(TMUX).unwrap();
+    assert_eq!(plan.files[0].state, FileState::Outdated);
+    f.apply(TMUX, &plan).unwrap();
+    assert_eq!(fs::read(&target).unwrap(), b"declared\n");
+
+    // Content changed between preview and confirmation: nothing is adopted.
+    write(&target, b"local edit\n", 0o644);
+    let stale = files::preview_adoption(
+        f.home.path(),
+        "~/.config/tmux/tmux.conf",
+        &registry.read().unwrap(),
+    )
+    .unwrap();
+    assert!(stale.replaces_receipt);
+    write(&target, b"another edit\n", 0o644);
+    let snapshot = registry.read().unwrap();
+    let mut guard = registry.lock(&snapshot).unwrap();
+    assert!(matches!(
+        files::adopt(f.home.path(), &stale, &mut guard),
+        Err(Error::Safety(_))
+    ));
+    assert_eq!(guard.state, snapshot);
+    guard.forget("~/.config/tmux/tmux.conf").unwrap();
+    drop(guard);
+    assert!(target.exists());
+    assert!(registry.read().unwrap().files.is_empty());
+}
+
+#[test]
+fn adoption_refuses_unsupported_targets_and_stale_registry_snapshots() {
+    let f = Fixture::new();
+    let outside = tempfile::tempdir().unwrap();
+    fs::write(outside.path().join("x"), "x").unwrap();
+    std::os::unix::fs::symlink(outside.path().join("x"), f.home.path().join(".link")).unwrap();
+    let empty = FileRegistryState::default();
+    assert!(files::preview_adoption(f.home.path(), "~/.link", &empty).is_err());
+    assert!(files::preview_adoption(f.home.path(), "~/.absent", &empty).is_err());
+    fs::write(f.home.path().join(".big"), vec![b'x'; 1024 * 1024 + 1]).unwrap();
+    assert!(files::preview_adoption(f.home.path(), "~/.big", &empty).is_err());
+
+    let registry = f.registry();
+    let stale = FileRegistryState {
+        schema_version: 1,
+        files: vec![receipt("~/.a", b"a", "0600")],
+    };
+    assert!(matches!(registry.lock(&stale), Err(Error::Safety(_))));
+}

@@ -81,6 +81,49 @@ fn render(value: &Value) -> String {
                 render(&provider["plan"])
             ));
         }
+        if value["files"].is_object() {
+            text.push_str(&format!("\nFiles:\n{}", render(&value["files"])));
+        }
+        return text;
+    }
+    if let Some(writes) = value
+        .get("writes")
+        .and_then(Value::as_array)
+        .filter(|_| value.get("files").is_some())
+    {
+        let mut text = String::new();
+        for write in writes {
+            text.push_str(&format!(
+                "{} {} (mode {})\n{}",
+                string(&write["action"]),
+                string(&write["target"]),
+                string(&write["mode"]),
+                string(&write["diff"])
+            ));
+            if !text.ends_with('\n') {
+                text.push('\n');
+            }
+        }
+        if writes.is_empty() {
+            text.push_str("No file writes.\n");
+        }
+        text.push_str(&lines(&value["warnings"], "Warning: "));
+        return text;
+    }
+    if let Some(written) = value.get("written").and_then(Value::as_array) {
+        let mut text = String::new();
+        for write in written {
+            let verified = if write["verified"] == true {
+                "verified"
+            } else {
+                "NOT verified"
+            };
+            text.push_str(&format!(
+                "{} {} — {verified}\n",
+                string(&write["action"]),
+                string(&write["target"])
+            ));
+        }
         return text;
     }
     if value.get("missing").is_some() {

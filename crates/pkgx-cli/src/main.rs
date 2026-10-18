@@ -178,6 +178,11 @@ enum Commands {
         #[arg(long, value_enum, default_value = "apt")]
         provider: Vec<InventoryProvider>,
     },
+    /// Adopt, list or forget managed configuration file receipts (ADR 013).
+    File {
+        #[command(subcommand)]
+        command: FileCommand,
+    },
     /// Check, verify, install and track script recipes (explicit trust required).
     Recipe {
         #[command(subcommand)]
@@ -210,6 +215,27 @@ enum CompletionShell {
     Bash,
     Zsh,
     Fish,
+}
+
+#[derive(Subcommand)]
+enum FileCommand {
+    /// Back up an existing file and record it as managed; the next apply may replace it.
+    Adopt {
+        /// A ~/ path, or an absolute path below HOME.
+        target: String,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long, conflicts_with = "dry_run")]
+        yes: bool,
+    },
+    /// List file receipts; everything else is unmanaged.
+    List,
+    /// Drop a receipt without touching the file.
+    Forget {
+        target: String,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -498,6 +524,54 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 .collect::<Result<Vec<_>, _>>()?;
             display(&reports, cli.json)?;
         }
+        Commands::File { command } => {
+            let registry = file_registry(cli.state_dir.clone())?;
+            match command {
+                FileCommand::List => display(&registry.read()?, cli.json)?,
+                FileCommand::Adopt {
+                    target,
+                    dry_run,
+                    yes,
+                } => {
+                    let home = home_directory()?;
+                    let target = file_target(&home, &target)?;
+                    let state = registry.read()?;
+                    let preview = pkgx_core::files::preview_adoption(&home, &target, &state)?;
+                    if dry_run {
+                        display(&preview, cli.json)?;
+                        return Ok(());
+                    }
+                    eprintln!("{}", output::human(&preview)?);
+                    confirm_action(&runner, yes, "Adopt this file? Type yes: ")?;
+                    let mut guard = registry.lock(&state)?;
+                    display(
+                        &pkgx_core::files::adopt(&home, &preview, &mut guard)?,
+                        cli.json,
+                    )?;
+                }
+                FileCommand::Forget { target, yes } => {
+                    let home = home_directory()?;
+                    let target = file_target(&home, &target)?;
+                    let state = registry.read()?;
+                    let receipt =
+                        state
+                            .files
+                            .iter()
+                            .find(|r| r.target == target)
+                            .ok_or_else(|| {
+                                pkgx_core::Error::InvalidInput(format!("no receipt for {target}"))
+                            })?;
+                    eprintln!("{}", output::human(receipt)?);
+                    confirm_action(
+                        &runner,
+                        yes,
+                        "Forget this receipt? The file is not touched. Type yes: ",
+                    )?;
+                    registry.lock(&state)?.forget(&target)?;
+                    display(&serde_json::json!({"forgotten": target}), cli.json)?;
+                }
+            }
+        }
         Commands::Recipe { command } => {
             let store = || -> Result<_, pkgx_core::Error> {
                 Ok(pkgx_core::script::ReceiptStore::new(
@@ -700,11 +774,21 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 return Ok(());
             }
-            let state = load_manifest(
-                file.expect("clap requires manifest or saved plan"),
-                &cli.profile,
-            )?;
-            state.require_no_files()?;
+            let file = file.expect("clap requires manifest or saved plan");
+            let full = load_manifest(file.clone(), &cli.profile)?;
+            // Refuse file conflicts before any package transaction runs.
+            let files = file_review(&file, &full, cli.state_dir.clone())?;
+            if dry_run {
+                return display_manifest_plan(
+                    &runner,
+                    &full,
+                    files,
+                    cli.state_dir.clone(),
+                    cli.json,
+                );
+            }
+            let mut state = full.clone();
+            state.files.clear();
             let backends = manifest_backends(&state, &runner)?;
             if state.system.mode == pkgx_core::manifest::SyncMode::Strict {
                 let registry = managed_registry(cli.state_dir.clone())?;
@@ -732,20 +816,15 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                         None,
                         Some((&registry, &managed)),
                     )?;
-                } else {
+                } else if files.is_none() {
                     display(
                         &serde_json::json!({"operations":[],"success":true,"verified":true,"warnings":review.diff.warnings}),
                         cli.json,
                     )?;
                 }
-                return Ok(());
-            }
-            if dry_run {
-                let references: Vec<&dyn Backend> = backends.iter().map(|b| b.as_ref()).collect();
-                display(
-                    &manifest_plan(&references, &state, cli.state_dir.clone())?,
-                    cli.json,
-                )?;
+                if files.is_some() {
+                    apply_files(&runner, &file, &full, cli.state_dir.clone(), yes, cli.json)?;
+                }
                 return Ok(());
             }
             let observed = backends
@@ -764,10 +843,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 return Err(pkgx_core::Error::Unsupported("manifest requires a missing package from a provider without an executor; no changes performed".into()).into());
             }
             if diff.missing.is_empty() {
-                display(
-                    &serde_json::json!({"operations":[],"success":true,"verified":true,"warnings":diff.warnings}),
-                    cli.json,
-                )?;
+                if files.is_none() {
+                    display(
+                        &serde_json::json!({"operations":[],"success":true,"verified":true,"warnings":diff.warnings}),
+                        cli.json,
+                    )?;
+                }
             } else {
                 // One reviewed, confirmed transaction per provider in deterministic
                 // order; the first failure stops before later providers run.
@@ -785,6 +866,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     transact(&runner, &missing, &[], dry_run, yes, cli.json, &journal)?;
                 }
             }
+            if files.is_some() {
+                apply_files(&runner, &file, &full, cli.state_dir.clone(), yes, cli.json)?;
+            }
         }
         Commands::Plan {
             file,
@@ -794,13 +878,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             expires_in,
         } => {
             if let Some(file) = file {
-                let state = load_manifest(file, &cli.profile)?;
-                let backends = manifest_backends(&state, &runner)?;
-                let references: Vec<&dyn Backend> = backends.iter().map(|b| b.as_ref()).collect();
-                display(
-                    &manifest_plan(&references, &state, cli.state_dir.clone())?,
-                    cli.json,
-                )?;
+                let state = load_manifest(file.clone(), &cli.profile)?;
+                let files = file_review(&file, &state, cli.state_dir.clone())?;
+                display_manifest_plan(&runner, &state, files, cli.state_dir.clone(), cli.json)?;
             } else if let Some(package) = package {
                 let id = qualified_id(&package)?;
                 let selected = providers::backend(id.provider, &runner, std::env::consts::OS)?;
@@ -935,7 +1015,11 @@ fn home_directory() -> Result<PathBuf, pkgx_core::Error> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .filter(|home| home.is_absolute())
-        .ok_or_else(|| pkgx_core::Error::InvalidInput("recipes require an absolute HOME".into()))
+        .ok_or_else(|| {
+            pkgx_core::Error::InvalidInput(
+                "recipes and managed files require an absolute HOME".into(),
+            )
+        })
 }
 fn finish_script(
     record: pkgx_core::script::ScriptRecord,
@@ -1149,6 +1233,92 @@ fn managed_registry(
         state_directory(state_dir)?.join("managed"),
     ))
 }
+fn file_registry(
+    state_dir: Option<PathBuf>,
+) -> Result<pkgx_core::files::FileRegistry, pkgx_core::Error> {
+    Ok(pkgx_core::files::FileRegistry::new(
+        state_directory(state_dir)?.join("files"),
+    ))
+}
+/// Accept `~/x` or a shell-expanded absolute path below HOME (lexically).
+fn file_target(home: &std::path::Path, target: &str) -> Result<String, pkgx_core::Error> {
+    let target = match std::path::Path::new(target).strip_prefix(home) {
+        Ok(relative) if target.starts_with('/') => format!("~/{}", relative.to_string_lossy()),
+        _ => target.to_owned(),
+    };
+    pkgx_core::files::validate_target(&target)?;
+    Ok(target)
+}
+fn manifest_directory(manifest: &std::path::Path) -> &std::path::Path {
+    manifest
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."))
+}
+type FileReview = (
+    pkgx_core::files::FilePlan,
+    pkgx_core::files::FileRegistryState,
+);
+/// Plan declared files; None when the manifest declares none.
+fn file_review(
+    manifest: &std::path::Path,
+    state: &DesiredState,
+    state_dir: Option<PathBuf>,
+) -> Result<Option<FileReview>, pkgx_core::Error> {
+    if state.files.is_empty() {
+        return Ok(None);
+    }
+    let home = home_directory()?;
+    let sources = pkgx_core::files::load_sources(manifest_directory(manifest), &state.files)?;
+    let registry = file_registry(state_dir)?.read()?;
+    let plan = pkgx_core::files::plan(&home, &sources, &registry)?;
+    Ok(Some((plan, registry)))
+}
+fn display_manifest_plan(
+    runner: &session::Session,
+    state: &DesiredState,
+    files: Option<FileReview>,
+    state_dir: Option<PathBuf>,
+    json: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut packages = state.clone();
+    packages.files.clear();
+    let backends = manifest_backends(&packages, runner)?;
+    let references: Vec<&dyn Backend> = backends.iter().map(|b| b.as_ref()).collect();
+    let plan = manifest_plan(&references, &packages, state_dir)?;
+    match files {
+        None => Ok(display(&plan, json)?),
+        Some((files, _)) => {
+            let mut value = serde_json::to_value(&plan)?;
+            value["files"] = serde_json::to_value(&files)?;
+            Ok(display(&value, json)?)
+        }
+    }
+}
+/// Review, confirm and write declared files after package transactions succeeded.
+fn apply_files(
+    runner: &session::Session,
+    manifest: &std::path::Path,
+    state: &DesiredState,
+    state_dir: Option<PathBuf>,
+    yes: bool,
+    json: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (plan, snapshot) =
+        file_review(manifest, state, state_dir.clone())?.expect("manifest declares files");
+    if plan.writes.is_empty() {
+        return Ok(display(&plan, json)?);
+    }
+    eprintln!("{}", output::human(&plan)?);
+    confirm_action(runner, yes, "Write these files? Type yes: ")?;
+    let home = home_directory()?;
+    let registry = file_registry(state_dir)?;
+    let mut guard = registry.lock(&snapshot)?;
+    // Sources are read again; writes require the digests reviewed above.
+    let sources = pkgx_core::files::load_sources(manifest_directory(manifest), &state.files)?;
+    let written = pkgx_core::files::apply(&home, &sources, &plan, &mut guard)?;
+    Ok(display(&serde_json::json!({"written": written}), json)?)
+}
 /// Read-only observation of declared configuration files (ADR 013).
 fn observe_files(
     manifest: &std::path::Path,
@@ -1161,13 +1331,8 @@ fn observe_files(
         .ok_or_else(|| {
             pkgx_core::Error::InvalidInput("managed files require an absolute HOME".into())
         })?;
-    let directory = manifest
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or_else(|| std::path::Path::new("."));
-    let sources = pkgx_core::files::load_sources(directory, &state.files)?;
-    let registry =
-        pkgx_core::files::FileRegistry::new(state_directory(state_dir)?.join("files")).read()?;
+    let sources = pkgx_core::files::load_sources(manifest_directory(manifest), &state.files)?;
+    let registry = file_registry(state_dir)?.read()?;
     pkgx_core::files::observe(&home, &sources, &registry)
 }
 fn manifest_plan(

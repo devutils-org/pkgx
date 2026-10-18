@@ -207,12 +207,12 @@ source = "dotfiles/nvim/init.lua"
 
 **Tasks**
 
-- [x] ADR 013: schema (keyed by target, layered like packages, conflicts across layers are errors), versioning impact on `version = 1`, ownership/receipt model, copy vs symlink deployment. (Proposed in docs/adr/013-managed-config-files.md; not implemented.)
-- [x] Parse and validate file declarations: home-relative targets only, no parent traversal, sources confined to the manifest directory (no symlink escape), size limit, literal content only (no templates, variables or interpolation). (Unit-tested; `plan -f`/`apply -f` refuse file manifests until writes exist.)
-- [x] Observe target state without mutation: `missing`, `in_sync`, `drifted` (managed file changed locally since its receipt), `unmanaged_conflict` (existing file never written by pkgx), plus non-regular targets. (`diff` only, plus `undeclared` receipts; fixture-tested.)
-- [ ] Integrate files into `diff`, `plan -f` and `apply -f`, after package transactions; previews show a content diff with an explicit warning that file contents are displayed.
-- [ ] Write atomically as the user (staging + rename), never follow a destination symlink, create parent directories with private permissions, refuse setuid/setgid modes; record a receipt (target, source digest, written digest, mode).
-- [ ] Overwrite only files whose current digest matches their receipt; `drifted` and `unmanaged_conflict` targets are refused unless explicitly adopted (`pkgx adopt-file`-style grant, previewed, the previous content kept as a private backup).
+- [x] ADR 013: schema (keyed by target, layered like packages, conflicts across layers are errors), versioning impact on `version = 1`, ownership/receipt model, copy vs symlink deployment. (docs/adr/013-managed-config-files.md.)
+- [x] Parse and validate file declarations: home-relative targets only, no parent traversal, sources confined to the manifest directory (no symlink escape), size limit, literal content only (no templates, variables or interpolation). (Unit-tested.)
+- [x] Observe target state without mutation: `missing`, `in_sync`, `drifted` (managed file changed locally since its receipt), `unmanaged_conflict` (existing file never written by pkgx), plus non-regular targets. (Plus `outdated` and `undeclared`; fixture-tested.)
+- [x] Integrate files into `diff`, `plan -f` and `apply -f`, after package transactions; previews show a content diff with an explicit warning that file contents are displayed. (CLI only; TUI refuses file manifests.)
+- [x] Write atomically as the user (staging + rename), never follow a destination symlink, create parent directories with private permissions, refuse setuid/setgid modes; record a receipt (target, source digest, written digest, mode). (Temporary-HOME regressions; no sandbox run yet.)
+- [x] Overwrite only files whose current digest matches their receipt; `drifted` and `unmanaged_conflict` targets are refused unless explicitly adopted (`pkgx adopt-file`-style grant, previewed, the previous content kept as a private backup). (`pkgx file adopt|list|forget`.)
 - [ ] Removing a declaration only forgets ownership; deleting a managed file requires an explicit, previewed prune limited to files still matching their receipt. Never delete unmanaged or drifted files.
 - [ ] Show managed files, drift and receipts in `audit`/TUI manifest review; `export` does not capture file contents.
 - [ ] Validate in a sandbox with a private HOME (loopback-only), including drift, conflicts, interrupted writes and repeated apply as a no-op.

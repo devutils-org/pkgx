@@ -10,10 +10,12 @@ _pkgx() {
         --expires-in) COMPREPLY=( $(compgen -W '300 600 1800 3600' -- "$cur") ); return ;;
         --state-dir) COMPREPLY=( $(compgen -d -- "$cur") ); return ;;
     esac
-    if [[ "$command" == recipe && $COMP_CWORD -eq 2 ]]; then
+    if [[ "$command" == file && $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W 'adopt list forget' -- "$cur") )
+    elif [[ "$command" == recipe && $COMP_CWORD -eq 2 ]]; then
         COMPREPLY=( $(compgen -W 'check verify install uninstall list forget' -- "$cur") )
     elif (( COMP_CWORD == 1 )); then
-        COMPREPLY=( $(compgen -W 'demo manage managed providers doctor list search info why deps install remove export diff plan apply audit clean history recipe tui completions help' -- "$cur") )
+        COMPREPLY=( $(compgen -W 'demo manage managed providers doctor list search info why deps install remove export diff plan apply audit clean history file recipe tui completions help' -- "$cur") )
     else
         COMPREPLY=( $(compgen -W '--help --json --sudo --provider --file --output --profile --state-dir --dry-run --yes --installed --forget --allow-apply --snapshot --limit --offset --save --expires-in --plan' -- "$cur") )
     fi

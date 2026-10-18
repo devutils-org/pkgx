@@ -258,13 +258,13 @@ impl DesiredState {
             .map(|(provider, name)| parse_name(provider.parse()?, name))
             .collect()
     }
-    /// File planning and writes are not implemented; refuse rather than ignore them.
+    /// Package-only planners (core, TUI) refuse files rather than silently ignore them.
     pub fn require_no_files(&self) -> Result<(), Error> {
         if self.files.is_empty() {
             return Ok(());
         }
         Err(Error::Unsupported(
-            "managed configuration files (ADR 013) are observed by diff only; file plans and writes are not implemented yet".into(),
+            "managed configuration files (ADR 013) are planned and written only by the CLI `plan -f`/`apply -f`; this review covers packages only".into(),
         ))
     }
     pub fn providers(&self) -> Result<Vec<ProviderId>, Error> {

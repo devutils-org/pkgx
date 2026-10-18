@@ -1,9 +1,10 @@
 # ADR 013: Managed user configuration files
 
-Status: partially implemented. Schema validation, layering, source loading and
-read-only `diff` observation exist with unit/CLI regressions; plans, writes,
-adoption and removal are not implemented and `plan -f`/`apply -f` refuse manifests
-that declare files. Roadmap milestone M8.
+Status: implemented experimentally except removal. Schema, layering, confined
+sources, `diff` states, CLI `plan -f`/`apply -f` writes and `pkgx file adopt|list|
+forget` have unit and CLI regressions against temporary HOME directories; no
+sandbox validation yet. `pkgx file remove` is not implemented. The core/TUI package
+planners still refuse manifests declaring files. Roadmap milestone M8.
 
 Users want their configuration (e.g. `~/.tmux.conf`) declared next to the packages
 that read it. pkgx manages such files as opaque owned content: it copies declared
@@ -85,19 +86,26 @@ local edits are discarded deliberately; the edited bytes are backed up first.
 `pkgx file list` shows receipts; `pkgx file forget TARGET` drops a receipt and touches
 nothing on disk.
 
-Writing. `apply -f` runs file writes after all package transactions succeed; a package
-failure stops before any file is written. Files need no privileges: running as root,
-or with `--sudo`, is refused. For each target, immediately before writing, the target
-must still be in its planned state (digest and mode) and the source must still match
-its reviewed digest. Missing parent directories are created with mode 0700 without
-following symlinks. Content goes to an exclusively created temporary file in the same
-directory, gets its mode, is fsynced, renamed over the target and the directory is
-fsynced; then the receipt is updated. Intent and verified results are journaled. The
-first failure stops later files. A concurrent process can still change a target
-between the final check and the rename; this residual race is documented, not hidden.
+Writing. `apply -f` plans files before any package transaction (conflicts abort
+early), then runs package transactions, then shows the file preview and asks for its
+own confirmation; a package failure stops before any file is written. Files need no
+privileges: writes as root are refused, and `--sudo` never applies to them. For each
+target, immediately before writing, the registry snapshot, the target's planned state
+(absent, or digest and mode) and the re-read source digest must all still match the
+review. Missing parent directories are created with mode 0700 without following
+symlinks. Content goes to an exclusively created `.pkgx-*` temporary file in the same
+directory, gets its mode, is fsynced, renamed over the target (no-clobber for creates;
+a rename replaces a racing symlink itself rather than following it) and the directory
+is fsynced; then the receipt is updated and the result verified. The first failure
+stops later files. File writes are not in the native transaction journal; receipts are
+their record. A crash after the rename but before the receipt leaves a file reported as
+`in_sync` (updates) or `unmanaged_conflict` (creates, adopt to resume); a crash before
+the rename may leave a `.pkgx-*` temporary file. A concurrent process can still change
+a target between the final check and the rename; this residual race is documented,
+not hidden.
 
 Removal. Dropping a declaration only reports the target as `undeclared` and keeps its
-receipt; nothing is deleted. `pkgx file remove TARGET [--dry-run|--yes]` deletes a
+receipt; nothing is deleted. A future `pkgx file remove TARGET [--dry-run|--yes]` (not implemented) deletes a
 file only when it still matches its receipt, after preview and confirmation, then
 drops the receipt. Drifted, unmanaged or unsupported files are never deleted. Strict
 mode (ADR 005) does not extend to files.

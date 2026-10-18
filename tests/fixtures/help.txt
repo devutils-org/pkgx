@@ -19,6 +19,7 @@ Commands:
   tui          Open the package browser (read-only unless --allow-apply)
   audit        Inspect native orphans, caches and residual records; never deletes anything
   clean        Preview cleanup, or run native cache cleanup / reviewed orphan removal
+  file         Adopt, list or forget managed configuration file receipts (ADR 013)
   recipe       Check, verify, install and track script recipes (explicit trust required)
   completions  Print Bash, Zsh or Fish completion definitions
   history      Read transaction records; missing results are running or unknown
