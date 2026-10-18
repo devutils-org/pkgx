@@ -34,7 +34,7 @@ jobs:
           docker run --rm \
             -v "$PWD/target/x86_64-unknown-linux-musl/release/pkgx:/usr/local/bin/pkgx:ro" \
             -v "$PWD/tests/containers:/checks:ro" \
-            "$CONTAINER_IMAGE" sh -c 'apt-get update && sh /checks/inspection.sh && sh /checks/transactions.sh && sh /checks/privilege.sh'
+            "$CONTAINER_IMAGE" sh -c 'apt-get update && sh /checks/inspection.sh && sh /checks/transactions.sh && sh /checks/privilege.sh && sh /checks/privilege-pam.sh'
 
   native-inventory:
     runs-on: ubuntu-latest

@@ -80,8 +80,10 @@ with a static musl pkgx. Host package databases were never targets.
   confirmed install, idempotent re-apply, hold and Essential refusals, unconfirmed
   refusal, saved manual-mark plan, stale saved plan refusal, strict-mode grant and
   removal, and `--sudo` refusal without policy followed by delegated install/removal
-  under a NOPASSWD apt-get rule with private 0700/0600 journals. The interactive
-  PAM prompt was not exercised.
+  under a NOPASSWD apt-get rule with private 0700/0600 journals. `privilege-pam.sh`
+  (bookworm) drove the interactive path through a pseudo-terminal with a
+  password-required rule: a wrong password was refused before any transaction,
+  and the right one authorized a verified install and removal.
 - Fedora 44 (dnf5 5.4.1): `rpm.sh` and `dnf-transactions.sh` passed — read-only
   checks, confirmed install with native user-installed reason, idempotent re-apply,
   protected-package refusal, stale saved plan refusal and reviewed removal.

@@ -15,8 +15,9 @@ WORK=${1:?usage: debian-userns.sh WORKDIR STATIC_PKGX [SUITE [MIRROR]]}
 PKGX=${2:?usage: debian-userns.sh WORKDIR STATIC_PKGX [SUITE [MIRROR]]}
 SUITE=${3:-bookworm}
 MIRROR=${4:-http://deb.debian.org/debian}
-CHECKS=${CHECKS:-inspection.sh transactions.sh privilege.sh}
+CHECKS=${CHECKS:-inspection.sh transactions.sh privilege.sh privilege-pam.sh}
 HERE=$(cd "$(dirname "$0")" && pwd)
+CHECK_DIR=$(cd "${CHECK_DIR:-$HERE/../containers}" && pwd)
 [ "$(id -u)" -ne 0 ] || { echo 'refusing to run as real root' >&2; exit 1; }
 full() {
     unshare --map-auto --map-root-user --mount --pid --fork --kill-child "$@"
@@ -49,7 +50,7 @@ full env LC_ALL=C pacman --root "$TOOLS" --dbpath "$TOOLS/var/lib/pacman" \
     debootstrap debian-archive-keyring ubuntu-keyring ca-certificates \
     coreutils grep sed gawk tar gzip xz zstd binutils findutils util-linux
 NAME=$(basename "$(mktemp -d "$TOOLS/srv/$SUITE.XXXXXX")")
-export TOOLS NAME SUITE MIRROR CHECKS PKGX HERE
+export TOOLS NAME SUITE MIRROR CHECKS PKGX CHECK_DIR
 full sh -eu <<'INNER'
 mount -t tmpfs -o mode=0755 tmpfs "$TOOLS/srv/$NAME"
 mkdir -p "$TOOLS/var/cache/debootstrap"
@@ -64,8 +65,11 @@ chroot "$TOOLS" /usr/bin/env -i PATH=/usr/bin LC_ALL=C \
 DEB="$TOOLS/srv/$NAME"
 mkdir -p "$DEB/checks"
 cp "$PKGX" "$DEB/usr/local/bin/pkgx"
-mount --bind "$HERE/../containers" "$DEB/checks"
+mount --bind "$CHECK_DIR" "$DEB/checks"
 mount --rbind /dev "$DEB/dev"
+# A private devpts instance lets sudo's use_pty allocate terminals in the namespace.
+mount -t devpts -o newinstance,ptmxmode=0666,mode=0620 devpts "$DEB/dev/pts"
+mount --bind "$DEB/dev/pts/ptmx" "$DEB/dev/ptmx"
 mount -t proc proc "$DEB/proc"
 cp /etc/resolv.conf "$DEB/etc/resolv.conf"
 in_deb() {

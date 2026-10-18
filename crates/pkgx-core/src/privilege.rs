@@ -300,13 +300,13 @@ fn wait_authentication(
         if canceled.load(Ordering::Relaxed) {
             stop_authentication(child)?;
             return Err(Error::Canceled(
-                "sudo authorization; no native transaction started".into(),
+                "sudo authorization (no native transaction started)".into(),
             ));
         }
         if start.elapsed() >= timeout {
             stop_authentication(child)?;
             return Err(Error::Timeout(
-                "sudo authorization; no native transaction started".into(),
+                "sudo authorization (no native transaction started)".into(),
             ));
         }
         match child.try_wait() {

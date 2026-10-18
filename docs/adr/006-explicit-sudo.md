@@ -1,6 +1,8 @@
 # ADR 006: Explicit APT sudo delegation
 
-Status: implemented and mocked; disposable native acceptance pending.
+Status: implemented; verified in rootless Debian/Ubuntu roots (noninteractive policy
+and an interactive PAM prompt through a pseudo-terminal). Pacman and DNF reuse the
+same delegation with their own exact templates (ADR 007, ADR 010).
 
 Privilege elevation is opt-in with --sudo. The flag is accepted only for install,
 remove, apply, or tui --allow-apply. Operation review/confirmation still comes first;

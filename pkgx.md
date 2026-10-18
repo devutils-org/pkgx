@@ -97,7 +97,7 @@ Planning and execution are separate: backends can propose native operations; the
 - [x] Implement `pkgx list`, `search`, `info`, `install`, `remove`, `plan`, `why` (initial scope).
 - [x] Expose native auto/manual installation reason and dependency information when available. (APT manual-mark transitions verified in rootless Debian/Ubuntu roots.)
 - [x] Ensure explicit provider selection (`--provider apt`) and unambiguous defaults.
-- [ ] Integrate permission prompts only at execution time; never require root for inspection. (Explicit --sudo verified natively with noninteractive sudoers policy in Debian/Ubuntu roots; interactive PAM prompt and TUI suspension pending.)
+- [x] Integrate permission prompts only at execution time; never require root for inspection. (Explicit --sudo verified natively in Debian/Ubuntu roots, including the interactive PAM prompt through a pseudo-terminal; TUI suspension remains unit-tested only.)
 - [x] Test against supported Debian/Ubuntu container images and negative/error cases. (Rootless Debian bookworm and Ubuntu 24.04 roots; CI containers configured.)
 
 **Acceptance**: dry-run outputs a meaningful operation list; canceling leaves state unchanged; real install/remove works in a disposable test environment; `why` clearly labels unknown provenance.
