@@ -15,6 +15,7 @@ Build **pkgx**, a CLI-first, eventually TUI-based manager that unifies supported
 - Automatically uninstalling arbitrary `curl | sh` installations.
 - Deleting user data or unowned files based on heuristics.
 - Full reproducible OS images (Nix/Guix replacement).
+- System-wide configuration management (`/etc`, services). Home-relative user configuration files are planned separately in M8.
 
 ### Invariants
 
@@ -183,6 +184,43 @@ Planning and execution are separate: backends can propose native operations; the
 
 **Acceptance**: documented support matrix passes CI; all mutating operations are plan-driven; known limitations are published; release artifacts are verified.
 
+### M8 — Managed user configuration files (planned, 3–5 weeks)
+
+Goal: declare user configuration files (e.g. `~/.tmux.conf`) next to their packages and
+reconcile them with the same diff → plan → apply review flow. This is file ownership,
+not configuration semantics: pkgx copies declared content, it does not understand,
+merge or generate tmux/shell/editor options. Record ADR 013 before any code.
+
+Illustrative schema (to be finalized in ADR 013):
+
+```toml
+[packages.apt]
+install = ["tmux"]
+
+[files."~/.tmux.conf"]
+source = "dotfiles/tmux.conf"   # relative to the manifest directory
+mode = "0644"
+
+[profiles.dev.files."~/.config/nvim/init.lua"]
+source = "dotfiles/nvim/init.lua"
+```
+
+**Tasks**
+
+- [ ] ADR 013: schema (keyed by target, layered like packages, conflicts across layers are errors), versioning impact on `version = 1`, ownership/receipt model, copy vs symlink deployment.
+- [ ] Parse and validate file declarations: home-relative targets only, no parent traversal, sources confined to the manifest directory (no symlink escape), size limit, literal content only (no templates, variables or interpolation).
+- [ ] Observe target state without mutation: `missing`, `in_sync`, `drifted` (managed file changed locally since its receipt), `unmanaged_conflict` (existing file never written by pkgx), plus non-regular targets.
+- [ ] Integrate files into `diff`, `plan -f` and `apply -f`, after package transactions; previews show a content diff with an explicit warning that file contents are displayed.
+- [ ] Write atomically as the user (staging + rename), never follow a destination symlink, create parent directories with private permissions, refuse setuid/setgid modes; record a receipt (target, source digest, written digest, mode).
+- [ ] Overwrite only files whose current digest matches their receipt; `drifted` and `unmanaged_conflict` targets are refused unless explicitly adopted (`pkgx adopt-file`-style grant, previewed, the previous content kept as a private backup).
+- [ ] Removing a declaration only forgets ownership; deleting a managed file requires an explicit, previewed prune limited to files still matching their receipt. Never delete unmanaged or drifted files.
+- [ ] Show managed files, drift and receipts in `audit`/TUI manifest review; `export` does not capture file contents.
+- [ ] Validate in a sandbox with a private HOME (loopback-only), including drift, conflicts, interrupted writes and repeated apply as a no-op.
+
+**Out of scope for M8**: system paths (`/etc`), services and reload actions (e.g. `tmux source-file` is suggested, never run), templating/per-host variables, secret management (contents are copied verbatim; storing secrets in manifests is discouraged), merging partial edits into foreign files.
+
+**Acceptance**: a manifest with packages and a dotfile reconciles idempotently; existing unmanaged files are never overwritten without explicit adoption; local edits are reported as drift instead of being silently reverted; nothing is deleted without a matching receipt and confirmation.
+
 ## 4. Example manifest (illustrative schema)
 
 ```toml
@@ -271,6 +309,7 @@ For each milestone:
 - Script receipt format, resource ownership, and secure execution model.
 - Plan serialization, expiration, and recovery after partial execution.
 - Supported OS/distribution and package-manager version matrix.
+- Managed configuration files (M8): copy vs symlink deployment, adoption of existing files, backups, schema versioning, future templating/secrets policy.
 
 **Default recommendation:** Linux-first; APT first; declarative additive manifests; explicit verified script recipes; macOS/Brew after core semantics are stable; TUI after CLI workflows are proven.
 
