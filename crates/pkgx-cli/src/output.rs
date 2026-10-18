@@ -95,6 +95,14 @@ fn render(value: &Value) -> String {
                 text.push_str(&format!("{label}\t{}\n", id(package)));
             }
         }
+        for file in value["files"].as_array().into_iter().flatten() {
+            let state = file["state"].as_str().unwrap_or_default().replace('_', " ");
+            let target = file["target"].as_str().unwrap_or_default();
+            match file["reason"].as_str() {
+                Some(reason) => text.push_str(&format!("file {state}\t{target} ({reason})\n")),
+                None => text.push_str(&format!("file {state}\t{target}\n")),
+            }
+        }
         text.push_str(&lines(&value["warnings"], "Warning: "));
         return text;
     }

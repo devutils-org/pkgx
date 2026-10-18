@@ -7,6 +7,7 @@ pub mod command;
 pub mod dependency;
 pub mod detection;
 pub mod execution;
+pub mod files;
 pub mod identity;
 pub mod journal;
 pub mod managed;

@@ -704,6 +704,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 file.expect("clap requires manifest or saved plan"),
                 &cli.profile,
             )?;
+            state.require_no_files()?;
             let backends = manifest_backends(&state, &runner)?;
             if state.system.mode == pkgx_core::manifest::SyncMode::Strict {
                 let registry = managed_registry(cli.state_dir.clone())?;
@@ -828,7 +829,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Commands::Diff { file } => {
-            let state = load_manifest(file, &cli.profile)?;
+            let state = load_manifest(file.clone(), &cli.profile)?;
             let backends = manifest_backends(&state, &runner)?;
             let observed = backends
                 .iter()
@@ -837,11 +838,14 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 .into_iter()
                 .flatten()
                 .collect::<Vec<_>>();
-            let diff = if state.system.mode == pkgx_core::manifest::SyncMode::Strict {
+            let mut diff = if state.system.mode == pkgx_core::manifest::SyncMode::Strict {
                 state.diff_managed(&observed, &managed_registry(cli.state_dir.clone())?.read()?)?
             } else {
                 state.diff(&observed)?
             };
+            if !state.files.is_empty() {
+                diff.files = observe_files(&file, &state, cli.state_dir.clone())?;
+            }
             display(&diff, cli.json)?;
         }
         Commands::Export { output, provider } => {
@@ -1144,6 +1148,27 @@ fn managed_registry(
     Ok(pkgx_core::managed::ManagedRegistry::new(
         state_directory(state_dir)?.join("managed"),
     ))
+}
+/// Read-only observation of declared configuration files (ADR 013).
+fn observe_files(
+    manifest: &std::path::Path,
+    state: &DesiredState,
+    state_dir: Option<PathBuf>,
+) -> Result<Vec<pkgx_core::files::FileStatus>, pkgx_core::Error> {
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .filter(|home| home.is_absolute())
+        .ok_or_else(|| {
+            pkgx_core::Error::InvalidInput("managed files require an absolute HOME".into())
+        })?;
+    let directory = manifest
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let sources = pkgx_core::files::load_sources(directory, &state.files)?;
+    let registry =
+        pkgx_core::files::FileRegistry::new(state_directory(state_dir)?.join("files")).read()?;
+    pkgx_core::files::observe(&home, &sources, &registry)
 }
 fn manifest_plan(
     backends: &[&dyn Backend],

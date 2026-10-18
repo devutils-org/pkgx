@@ -1,4 +1,8 @@
-use crate::{identity::parse_name, Error, InstalledPackage, PackageId, ProviderId};
+use crate::{
+    files::{FileDeclaration, FileStatus},
+    identity::parse_name,
+    Error, InstalledPackage, PackageId, ProviderId,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,6 +14,8 @@ pub struct DesiredState {
     pub system: System,
     #[serde(default)]
     pub packages: BTreeMap<String, PackageSelection>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub files: BTreeMap<String, FileDeclaration>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub profiles: BTreeMap<String, Profile>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -36,6 +42,8 @@ pub enum SyncMode {
 pub struct Layer {
     #[serde(default)]
     pub packages: BTreeMap<String, PackageSelection>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub files: BTreeMap<String, FileDeclaration>,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -44,6 +52,8 @@ pub struct Profile {
     pub extends: Vec<String>,
     #[serde(default)]
     pub packages: BTreeMap<String, PackageSelection>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub files: BTreeMap<String, FileDeclaration>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -56,6 +66,9 @@ pub struct Diff {
     pub present: Vec<PackageId>,
     pub undeclared: Vec<PackageId>,
     pub removals: Vec<PackageId>,
+    /// Declared configuration files (ADR 013), filled by callers that observe HOME.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<FileStatus>,
     pub warnings: Vec<String>,
 }
 fn validate_packages(packages: &BTreeMap<String, PackageSelection>) -> Result<(), Error> {
@@ -133,6 +146,7 @@ impl DesiredState {
             ));
         }
         validate_packages(&self.packages)?;
+        crate::files::validate_declarations(&self.files)?;
         for (os, layer) in &self.platforms {
             if !matches!(os.as_str(), "linux" | "macos") {
                 return Err(Error::InvalidInput(
@@ -140,6 +154,7 @@ impl DesiredState {
                 ));
             }
             validate_packages(&layer.packages)?;
+            crate::files::validate_declarations(&layer.files)?;
         }
         for (name, profile) in &self.profiles {
             if name.is_empty()
@@ -151,6 +166,7 @@ impl DesiredState {
                 return Err(Error::InvalidInput("invalid profile name".into()));
             }
             validate_packages(&profile.packages)?;
+            crate::files::validate_declarations(&profile.files)?;
             self.visit_profile(
                 name,
                 &mut BTreeSet::new(),
@@ -199,9 +215,12 @@ impl DesiredState {
         result.platforms.clear();
         let mut packages = BTreeMap::new();
         merge(&mut packages, &self.packages);
+        let mut files = BTreeMap::new();
+        crate::files::merge(&mut files, &self.files)?;
         for (platform, layer) in &self.platforms {
             if platform == os {
                 merge(&mut packages, &layer.packages);
+                crate::files::merge(&mut files, &layer.files)?;
             } else {
                 result.resolution_notes.push(format!(
                     "Skipped platform section: {platform} (host: {os})."
@@ -215,11 +234,13 @@ impl DesiredState {
         }
         for name in order {
             merge(&mut packages, &self.profiles[&name].packages);
+            crate::files::merge(&mut files, &self.profiles[&name].files)?;
             result
                 .resolution_notes
                 .push(format!("Included profile: {name}."));
         }
         result.packages = packages;
+        result.files = files;
         Ok(result)
     }
     pub fn identities(&self) -> Result<Vec<PackageId>, Error> {
@@ -236,6 +257,15 @@ impl DesiredState {
             })
             .map(|(provider, name)| parse_name(provider.parse()?, name))
             .collect()
+    }
+    /// File planning and writes are not implemented; refuse rather than ignore them.
+    pub fn require_no_files(&self) -> Result<(), Error> {
+        if self.files.is_empty() {
+            return Ok(());
+        }
+        Err(Error::Unsupported(
+            "managed configuration files (ADR 013) are observed by diff only; file plans and writes are not implemented yet".into(),
+        ))
     }
     pub fn providers(&self) -> Result<Vec<ProviderId>, Error> {
         self.packages.keys().map(|p| p.parse()).collect()
@@ -280,6 +310,7 @@ impl DesiredState {
             present,
             undeclared,
             removals: vec![],
+            files: vec![],
             warnings,
         })
     }
@@ -345,6 +376,7 @@ impl DesiredState {
             version: 1,
             system: System::default(),
             packages,
+            files: BTreeMap::new(),
             profiles: BTreeMap::new(),
             platforms: BTreeMap::new(),
             resolution_notes: vec![],

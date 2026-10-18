@@ -397,3 +397,49 @@ fn recipe_install_previews_and_refuses_without_trust_before_any_download() {
     );
     assert_eq!(run(&["--sudo", "recipe", "list"]).status.code(), Some(1));
 }
+#[test]
+fn diff_observes_declared_files_and_plan_refuses_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("dotfiles")).unwrap();
+    std::fs::write(dir.path().join("dotfiles/tmux.conf"), "set -g mouse on\n").unwrap();
+    std::fs::write(home.path().join(".bashrc"), "existing\n").unwrap();
+    let manifest = dir.path().join("system.toml");
+    std::fs::write(
+        &manifest,
+        "version = 1\n[files.\"~/.tmux.conf\"]\nsource = \"dotfiles/tmux.conf\"\nmode = \"0644\"\n[files.\"~/.bashrc\"]\nsource = \"dotfiles/tmux.conf\"\n",
+    )
+    .unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_pkgx"))
+            .args(args)
+            .arg("-f")
+            .arg(&manifest)
+            .arg("--state-dir")
+            .arg(state.path())
+            .env("HOME", home.path())
+            .env("PATH", "")
+            .output()
+            .unwrap()
+    };
+    let output = run(&["diff", "--json"]);
+    assert!(output.status.success(), "{output:?}");
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["data"]["files"][0]["target"], "~/.bashrc");
+    assert_eq!(value["data"]["files"][0]["state"], "unmanaged_conflict");
+    assert_eq!(value["data"]["files"][1]["state"], "missing");
+    let text = run(&["diff"]);
+    assert!(String::from_utf8_lossy(&text.stdout).contains("file missing\t~/.tmux.conf"));
+    for args in [&["plan"][..], &["apply", "--dry-run"], &["apply", "--yes"]] {
+        let refused = run(args);
+        assert_eq!(refused.status.code(), Some(1), "{args:?}");
+        assert!(String::from_utf8_lossy(&refused.stderr).contains("ADR 013"));
+    }
+    assert!(!home.path().join(".tmux.conf").exists());
+    assert_eq!(
+        std::fs::read_to_string(home.path().join(".bashrc")).unwrap(),
+        "existing\n"
+    );
+    assert!(!state.path().join("files").exists());
+}

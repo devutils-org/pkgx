@@ -2,6 +2,9 @@
 
 ## 0.1.0 — unreleased
 
+- Add experimental `files` manifest declarations for home-relative configuration
+  files (ADR 013): strict validation, layering, confined source loading and
+  read-only `diff` states. Plans and writes are refused until implemented.
 - Add experimental confirmed Pacman execution: --needed previews, HoldPkg/IgnorePkg
   and critical-package policy, repository pinning, version verification, journals,
   saved plans, TUI and exact-template sudo delegation (ADR 007).

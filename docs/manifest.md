@@ -35,7 +35,8 @@ Provider sections accept `install`, with names already scoped by the provider ke
 See [identities and capabilities](backends.md). APT example names omit `apt:`. Brew
 names include `:formula` or `:cask`; Flatpak names include a full kind/ref and scope.
 Scripts are configured through a separate recipe schema and cannot appear in package
-sections. Selectors, files, globs and executable/interpolated fields are rejected.
+sections. Selectors, globs and executable/interpolated fields are rejected; files use the
+separate `files` table below.
 Search commands alone accept native regex patterns.
 
 `system`, name, mode, packages, platforms and profiles are optional. Mode defaults to
@@ -57,6 +58,26 @@ separate reviewed transaction in stable order, stopping at the first failure. A 
 manifest is a successful no-op. Existing versions satisfy presence; version sync is
 not supported. Additive mode retains all undeclared software. Strict mode retains
 all ungranted identities and refuses native removal cascades outside its scope.
+
+## Configuration files (experimental, read-only)
+
+Home-relative configuration files can be declared in the base, platform and profile
+layers (ADR 013). Sources are relative to the manifest directory, must be regular
+files without symlinks and are limited to 1 MiB each (16 MiB in total). `mode`
+accepts 0600 (default), 0644, 0700 or 0755. Identical declarations across layers
+collapse; differing ones are an error.
+
+```toml
+[files."~/.tmux.conf"]
+source = "dotfiles/tmux.conf"
+mode = "0644"
+```
+
+`diff` reports each target as missing, in sync, outdated, drifted, unmanaged
+conflict, unsupported or undeclared, without creating state or touching HOME.
+Receipts are read from `<state-dir>/files`. File writes, adoption and removal are not
+implemented: `plan -f` and `apply -f` refuse manifests declaring files. `export`
+never includes files.
 
 Unknown schema versions are rejected. Future incompatible changes require a new
 version and explicit migration preserving the original; no migration is implicit.

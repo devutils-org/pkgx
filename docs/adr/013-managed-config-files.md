@@ -1,6 +1,9 @@
 # ADR 013: Managed user configuration files
 
-Status: proposed; not implemented. Roadmap milestone M8.
+Status: partially implemented. Schema validation, layering, source loading and
+read-only `diff` observation exist with unit/CLI regressions; plans, writes,
+adoption and removal are not implemented and `plan -f`/`apply -f` refuse manifests
+that declare files. Roadmap milestone M8.
 
 Users want their configuration (e.g. `~/.tmux.conf`) declared next to the packages
 that read it. pkgx manages such files as opaque owned content: it copies declared
@@ -46,12 +49,15 @@ writer refuses to follow. Copies make drift measurable by digest.
 Observation (read-only, creates no state). Each target is classified as:
 
 - `missing`: absent;
-- `in_sync`: managed, content and mode equal to the declaration;
+- `in_sync`: managed, content and mode equal to the declaration (also when a local
+  edit was copied back into the source: nothing would be overwritten);
 - `outdated`: managed, still matching its receipt, but the declaration changed;
-- `drifted`: managed, content or mode changed since pkgx last wrote it;
+- `drifted`: managed, content or mode differs from both the receipt and the
+  declaration;
 - `unmanaged_conflict`: present without a receipt (whatever its content);
 - `unsupported`: symlink, directory, special file, foreign owner, or a symlinked or
-  non-directory ancestor.
+  non-directory ancestor;
+- `undeclared`: a receipt whose target is no longer declared (retained, never removed).
 
 `diff` reports these states. `plan -f` proposes writes only for `missing` and
 `outdated`; `drifted`, `unmanaged_conflict` and `unsupported` make the plan fail with

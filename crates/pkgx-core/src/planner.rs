@@ -78,6 +78,7 @@ pub fn plan_manifest_multi_managed(
     managed: &crate::managed::ManagedState,
 ) -> Result<MultiPlan, Error> {
     desired.identities()?;
+    desired.require_no_files()?;
     let mut observed = vec![];
     let mut providers = vec![];
     let wanted = desired.providers()?;
