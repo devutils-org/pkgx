@@ -90,10 +90,13 @@ pkgx file adopt ~/.tmux.conf
 pkgx apply -f system.toml
 pkgx file list
 pkgx file forget ~/.tmux.conf   # drops the receipt, keeps the file
+pkgx file remove ~/.tmux.conf --dry-run
 ```
 
-Removing a declaration keeps the file and its receipt (reported as undeclared); pkgx
-never deletes configuration files. `export` never includes files. The TUI manifest
+Removing a declaration keeps the file and its receipt (reported as undeclared).
+Only `pkgx file remove` deletes a file, and only a managed file still identical to its
+receipt, after preview, confirmation and a private backup; drifted or unmanaged
+files are never deleted. `export` never includes files. The TUI manifest
 review covers packages only and refuses manifests declaring files.
 
 Unknown schema versions are rejected. Future incompatible changes require a new

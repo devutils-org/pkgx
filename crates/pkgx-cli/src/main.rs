@@ -178,7 +178,7 @@ enum Commands {
         #[arg(long, value_enum, default_value = "apt")]
         provider: Vec<InventoryProvider>,
     },
-    /// Adopt, list or forget managed configuration file receipts (ADR 013).
+    /// Adopt, list, forget or remove managed configuration files (ADR 013).
     File {
         #[command(subcommand)]
         command: FileCommand,
@@ -222,6 +222,14 @@ enum FileCommand {
     /// Back up an existing file and record it as managed; the next apply may replace it.
     Adopt {
         /// A ~/ path, or an absolute path below HOME.
+        target: String,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long, conflicts_with = "dry_run")]
+        yes: bool,
+    },
+    /// Delete a managed file still matching its receipt (backed up first).
+    Remove {
         target: String,
         #[arg(long)]
         dry_run: bool,
@@ -548,6 +556,25 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                         &pkgx_core::files::adopt(&home, &preview, &mut guard)?,
                         cli.json,
                     )?;
+                }
+                FileCommand::Remove {
+                    target,
+                    dry_run,
+                    yes,
+                } => {
+                    let home = home_directory()?;
+                    let target = file_target(&home, &target)?;
+                    let state = registry.read()?;
+                    let preview = pkgx_core::files::preview_removal(&home, &target, &state)?;
+                    if dry_run {
+                        display(&preview, cli.json)?;
+                        return Ok(());
+                    }
+                    eprintln!("{}", output::human(&preview)?);
+                    confirm_action(&runner, yes, "Delete this managed file? Type yes: ")?;
+                    let mut guard = registry.lock(&state)?;
+                    pkgx_core::files::remove(&home, &preview, &mut guard)?;
+                    display(&serde_json::json!({"removed": target}), cli.json)?;
                 }
                 FileCommand::Forget { target, yes } => {
                     let home = home_directory()?;

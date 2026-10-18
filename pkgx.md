@@ -213,9 +213,9 @@ source = "dotfiles/nvim/init.lua"
 - [x] Integrate files into `diff`, `plan -f` and `apply -f`, after package transactions; previews show a content diff with an explicit warning that file contents are displayed. (CLI only; TUI refuses file manifests.)
 - [x] Write atomically as the user (staging + rename), never follow a destination symlink, create parent directories with private permissions, refuse setuid/setgid modes; record a receipt (target, source digest, written digest, mode). (Temporary-HOME regressions; no sandbox run yet.)
 - [x] Overwrite only files whose current digest matches their receipt; `drifted` and `unmanaged_conflict` targets are refused unless explicitly adopted (`pkgx adopt-file`-style grant, previewed, the previous content kept as a private backup). (`pkgx file adopt|list|forget`.)
-- [ ] Removing a declaration only forgets ownership; deleting a managed file requires an explicit, previewed prune limited to files still matching their receipt. Never delete unmanaged or drifted files.
+- [x] Removing a declaration only forgets ownership; deleting a managed file requires an explicit, previewed prune limited to files still matching their receipt. Never delete unmanaged or drifted files. (`pkgx file remove`, backed up first.)
 - [ ] Show managed files, drift and receipts in `audit`/TUI manifest review; `export` does not capture file contents.
-- [ ] Validate in a sandbox with a private HOME (loopback-only), including drift, conflicts, interrupted writes and repeated apply as a no-op.
+- [x] Validate in a sandbox with a private HOME (loopback-only), including drift, conflicts, interrupted writes and repeated apply as a no-op. (tests/sandbox/files-userns.sh; interrupted writes not exercised.)
 
 **Out of scope for M8**: system paths (`/etc`), services and reload actions (e.g. `tmux source-file` is suggested, never run), templating/per-host variables, secret management (contents are copied verbatim; storing secrets in manifests is discouraged), merging partial edits into foreign files.
 

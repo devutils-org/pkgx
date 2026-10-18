@@ -952,3 +952,109 @@ pub fn adopt(
     guard.record(receipt.clone())?;
     Ok(receipt)
 }
+
+/// What removal would delete: only a file still identical to its receipt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RemovalPreview {
+    pub target: String,
+    pub sha256: String,
+    pub bytes: u64,
+    pub mode: String,
+    pub warning: String,
+}
+pub fn preview_removal(
+    home: &Path,
+    target: &str,
+    registry: &FileRegistryState,
+) -> Result<RemovalPreview, Error> {
+    registry.validate()?;
+    let receipt = registry
+        .files
+        .iter()
+        .find(|r| r.target == target)
+        .ok_or_else(|| {
+            Error::Safety(format!(
+                "{target} has no receipt; pkgx never deletes unmanaged files"
+            ))
+        })?;
+    match inspect(home, target)? {
+        Inspection::Regular { sha256, mode, bytes }
+            if sha256 == receipt.sha256 && mode == receipt_mode_bits(&receipt.mode)? =>
+        {
+            Ok(RemovalPreview {
+                target: target.into(),
+                sha256,
+                bytes,
+                mode: mode_text(mode),
+                warning: "The file is backed up privately, deleted, and its receipt dropped. Keep or remove its manifest declaration, or the next apply recreates it.".into(),
+            })
+        }
+        Inspection::Regular { .. } => Err(Error::Safety(format!(
+            "{target} changed since pkgx last wrote it; drifted files are never deleted"
+        ))),
+        Inspection::Absent => Err(Error::InvalidInput(format!(
+            "{target} is already absent; use pkgx file forget to drop its receipt"
+        ))),
+        Inspection::Unsupported(reason) => Err(Error::Safety(format!("{target}: {reason}"))),
+    }
+}
+/// Back up and unlink a reviewed managed file, then drop its receipt.
+pub fn remove(
+    home: &Path,
+    preview: &RemovalPreview,
+    guard: &mut FileGuard<'_>,
+) -> Result<(), Error> {
+    not_root()?;
+    guard.validate()?;
+    let path = target_path(home, &preview.target)?;
+    if inspect(home, &preview.target)?
+        != (Inspection::Regular {
+            sha256: preview.sha256.clone(),
+            mode: receipt_mode_bits(&preview.mode)?,
+            bytes: preview.bytes,
+        })
+    {
+        return Err(Error::Safety(format!(
+            "{} changed since review; nothing removed",
+            preview.target
+        )));
+    }
+    // Hash through one no-follow descriptor and require the path to still name it.
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    let mut file = options.open(&path).map_err(io)?;
+    let mut bytes = vec![];
+    (&mut file)
+        .take(SOURCE_LIMIT + 1)
+        .read_to_end(&mut bytes)
+        .map_err(io)?;
+    if sha256_hex(&bytes) != preview.sha256 {
+        return Err(Error::Safety(format!(
+            "{} changed since review; nothing removed",
+            preview.target
+        )));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let opened = file.metadata().map_err(io)?;
+        let current = fs::symlink_metadata(&path).map_err(io)?;
+        if (opened.dev(), opened.ino()) != (current.dev(), current.ino()) {
+            return Err(Error::Safety(format!(
+                "{} was replaced since review; nothing removed",
+                preview.target
+            )));
+        }
+    }
+    guard.backup(&preview.sha256, &bytes)?;
+    fs::remove_file(&path).map_err(io)?;
+    fs::File::open(path.parent().expect("target below home"))
+        .and_then(|dir| dir.sync_all())
+        .map_err(io)?;
+    guard.forget(&preview.target)
+}

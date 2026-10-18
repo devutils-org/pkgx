@@ -435,3 +435,54 @@ fn adoption_refuses_unsupported_targets_and_stale_registry_snapshots() {
     };
     assert!(matches!(registry.lock(&stale), Err(Error::Safety(_))));
 }
+
+#[test]
+fn removal_deletes_only_unchanged_managed_files_after_backup() {
+    let f = Fixture::new();
+    fs::write(f.repo.path().join("tmux.conf"), "declared\n").unwrap();
+    f.apply(TMUX, &f.plan(TMUX).unwrap()).unwrap();
+    let target = f.home.path().join(".config/tmux/tmux.conf");
+    let registry = f.registry();
+    let name = "~/.config/tmux/tmux.conf";
+
+    let unmanaged = f.home.path().join(".bashrc");
+    write(&unmanaged, b"mine\n", 0o644);
+    assert!(files::preview_removal(f.home.path(), "~/.bashrc", &registry.read().unwrap()).is_err());
+
+    write(&target, b"edited\n", 0o644);
+    assert!(matches!(
+        files::preview_removal(f.home.path(), name, &registry.read().unwrap()),
+        Err(Error::Safety(_))
+    ));
+    write(&target, b"declared\n", 0o644);
+
+    let preview = files::preview_removal(f.home.path(), name, &registry.read().unwrap()).unwrap();
+    write(&target, b"changed after review\n", 0o644);
+    {
+        let mut guard = registry.lock(&registry.read().unwrap()).unwrap();
+        assert!(matches!(
+            files::remove(f.home.path(), &preview, &mut guard),
+            Err(Error::Safety(_))
+        ));
+    }
+    assert_eq!(fs::read(&target).unwrap(), b"changed after review\n");
+    write(&target, b"declared\n", 0o644);
+
+    let preview = files::preview_removal(f.home.path(), name, &registry.read().unwrap()).unwrap();
+    let mut guard = registry.lock(&registry.read().unwrap()).unwrap();
+    files::remove(f.home.path(), &preview, &mut guard).unwrap();
+    drop(guard);
+    assert!(!target.exists());
+    assert_eq!(fs::read(&unmanaged).unwrap(), b"mine\n");
+    assert!(registry.read().unwrap().files.is_empty());
+    let backup = f
+        .state
+        .path()
+        .join("files/backups")
+        .join(digest(b"declared\n"));
+    assert_eq!(fs::read(backup).unwrap(), b"declared\n");
+    assert!(matches!(
+        files::preview_removal(f.home.path(), name, &registry.read().unwrap()),
+        Err(Error::Safety(_))
+    ));
+}

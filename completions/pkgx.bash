@@ -11,7 +11,7 @@ _pkgx() {
         --state-dir) COMPREPLY=( $(compgen -d -- "$cur") ); return ;;
     esac
     if [[ "$command" == file && $COMP_CWORD -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W 'adopt list forget' -- "$cur") )
+        COMPREPLY=( $(compgen -W 'adopt list forget remove' -- "$cur") )
     elif [[ "$command" == recipe && $COMP_CWORD -eq 2 ]]; then
         COMPREPLY=( $(compgen -W 'check verify install uninstall list forget' -- "$cur") )
     elif (( COMP_CWORD == 1 )); then

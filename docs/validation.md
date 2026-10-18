@@ -13,7 +13,7 @@ CARGO_TARGET_DIR=/tmp/pkgx-target cargo build --release --locked --offline -p pk
 python3 scripts/test_package.py
 ```
 
-182 Rust tests passed, plus 2 Python packaging tests. One standalone ignored Rust
+183 Rust tests passed, plus 2 Python packaging tests. One standalone ignored Rust
 test is a subprocess fixture explicitly invoked by the inherited-pipe regression;
 it does not represent missing product coverage.
 
@@ -139,6 +139,21 @@ removed owned resources, retained the edited configuration and dropped the recei
 a pre-existing user file could not be claimed by a new install. With `--observe`,
 the fixture's undeclared `~/.cache/demo-tool.log` was reported, the receipt was
 classified `observed`, and the log survived uninstall.
+
+## Managed configuration file sandbox — 2026-10-18
+
+`tests/sandbox/files-userns.sh target/debug/pkgx` runs `tests/sandbox/files-checks.sh`
+in bubblewrap with the host bound read-only, private tmpfs /tmp (HOME and state
+directory) and no network. It passed: an unmanaged `~/.bashrc` blocked `apply` with
+no file or state created; adoption without --yes was refused, then stored a private
+0600 backup in a 0700 registry; `apply` replaced the adopted file, created
+`~/.config/tmux/tmux.conf` with mode 0644 and 0700 parents, left no temporary file
+and was a no-op when repeated; a local edit was reported as drift and kept, and
+became in sync once copied into the source; a symlinked target, symlinked ancestor
+and symlinked source were refused without touching the outside files; a held lock
+refused writes; `file remove` refused a drifted file and deleted an unchanged one
+with its receipt; `file forget` kept the file. Interrupted writes and running as root
+were exercised only by unit-level reasoning, not in the sandbox.
 
 ## Native and terminal evidence
 

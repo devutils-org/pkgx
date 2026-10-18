@@ -10,7 +10,7 @@ commands=(
   'export:Export an additive manifest' 'diff:Inspect manifest drift'
   'plan:Inspect native operations' 'apply:Reconcile an additive manifest'
   'audit:Inspect native orphan candidates' 'clean:Preview cleanup findings'
-  'history:Read transaction records' 'file:Adopt, list or forget managed file receipts'
+  'history:Read transaction records' 'file:Adopt, list, forget or remove managed files'
   'recipe:Check, verify, install or track script recipes'
   'tui:Open the read-only package browser' 'completions:Print shell completions'
 )

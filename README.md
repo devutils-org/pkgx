@@ -82,8 +82,8 @@ atomically as your user after package transactions, with its own confirmation, a
 records private receipts. pkgx copies bytes only: no templates, merging, system paths
 or reload actions. Existing files are never overwritten until `pkgx file adopt`
 backs them up and records them; local edits to managed files are reported as drift
-and refused. pkgx never deletes configuration files (`file forget` drops a receipt
-only). See the [manifest reference](docs/manifest.md#configuration-files-experimental).
+and refused. Only `pkgx file remove` deletes a file, and only an unchanged managed
+one after preview and backup (`file forget` drops a receipt only). See the [manifest reference](docs/manifest.md#configuration-files-experimental).
 
 Recipe check/verify validate pinned integrity metadata and optionally verify a bounded
 HTTPS download in private temporary storage without executing it. `recipe install`
@@ -115,7 +115,7 @@ Tests use fixtures, injected runners, temporary storage, harmless utilities and 
 Ratatui TestBackend. Docker/Podman and APT are unavailable locally. Pacman 7.1.0 is checked
 read-only on the host; Pacman transactions and cleanup ran only in a disposable
 user-namespace Arch root, and recipe install/uninstall only in a loopback-only sandbox. Managed configuration
-files are tested only against temporary HOME directories (no sandbox run yet).
+files passed a bubblewrap sandbox with a private HOME.
 APT (Debian bookworm, Ubuntu 24.04) and DNF5 (Fedora 44) transactions ran in rootless
 disposable roots. Configured CI runs and macOS native validation remain pending. No host package
 transaction, cleanup or installation script has run. See [validation status](docs/support.md) and [local results](docs/validation.md),

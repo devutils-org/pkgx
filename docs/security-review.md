@@ -113,8 +113,8 @@ Residual risks:
 - Managed configuration files (ADR 013) are written as the user after review; a
   concurrent process can still change a target between the final check and the
   rename. Previews display file contents, so secrets in manifests are exposed to
-  the terminal. This boundary was added after the review above and has only
-  temporary-directory regressions.
+  the terminal. This boundary was added after the review above; it has unit
+  regressions and a Linux sandbox run, not a separate review.
 - Flatpak system-scope authorization relies on Flatpak's system helper and polkit.
 - The Flatpak local test repository is unsigned; signature handling against real
   remotes was not exercised.

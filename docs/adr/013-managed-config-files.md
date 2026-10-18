@@ -1,10 +1,10 @@
 # ADR 013: Managed user configuration files
 
-Status: implemented experimentally except removal. Schema, layering, confined
-sources, `diff` states, CLI `plan -f`/`apply -f` writes and `pkgx file adopt|list|
-forget` have unit and CLI regressions against temporary HOME directories; no
-sandbox validation yet. `pkgx file remove` is not implemented. The core/TUI package
-planners still refuse manifests declaring files. Roadmap milestone M8.
+Status: implemented experimentally in the CLI. Schema, layering, confined sources,
+`diff` states, `plan -f`/`apply -f` writes and `pkgx file adopt|list|forget|remove`
+have unit and CLI regressions and passed a bubblewrap sandbox with a private HOME
+(tests/sandbox/files-userns.sh, docs/validation.md). The core/TUI package planners
+still refuse manifests declaring files; macOS is unvalidated. Roadmap milestone M8.
 
 Users want their configuration (e.g. `~/.tmux.conf`) declared next to the packages
 that read it. pkgx manages such files as opaque owned content: it copies declared
@@ -105,9 +105,11 @@ a target between the final check and the rename; this residual race is documente
 not hidden.
 
 Removal. Dropping a declaration only reports the target as `undeclared` and keeps its
-receipt; nothing is deleted. A future `pkgx file remove TARGET [--dry-run|--yes]` (not implemented) deletes a
-file only when it still matches its receipt, after preview and confirmation, then
-drops the receipt. Drifted, unmanaged or unsupported files are never deleted. Strict
+receipt; nothing is deleted. `pkgx file remove TARGET [--dry-run|--yes]` deletes a
+file only when it still matches its receipt (digest and mode), after preview and
+confirmation: the file is re-hashed through one no-follow descriptor, must still be
+the same inode as the path, is backed up like an adoption, unlinked, and then its
+receipt is dropped. Drifted, unmanaged or unsupported files are never deleted. Strict
 mode (ADR 005) does not extend to files.
 
 Not covered: system paths and services, reload/restart hooks (tmux `source-file` may

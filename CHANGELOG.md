@@ -8,6 +8,8 @@
 - Plan and write declared files with `plan -f`/`apply -f` (unified-diff previews,
   separate confirmation, atomic no-follow writes, receipts) and add
   `pkgx file adopt|list|forget` with private backups (ADR 013).
+- Add `pkgx file remove` for unchanged managed files (inode-checked, backed up) and
+  a bubblewrap sandbox for managed files (tests/sandbox/files-userns.sh).
 - Add experimental confirmed Pacman execution: --needed previews, HoldPkg/IgnorePkg
   and critical-package policy, repository pinning, version verification, journals,
   saved plans, TUI and exact-template sudo delegation (ADR 007).

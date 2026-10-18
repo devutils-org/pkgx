@@ -12,13 +12,13 @@ Continuer en autonomie l’implémentation de `pkgx.md`, avec une interface TUI 
 - Exécuteurs revus pour APT, Pacman (ADR 007), DNF5 (ADR 010), Flatpak (ADR 011) et Homebrew formules (ADR 012) : préversion, confirmation, revalidation, journal, vérification post-transaction, `--sudo` limité à des modèles exacts (pas pour Flatpak/Homebrew). Aucun rollback garanti.
 - Manifestes TOML additifs/stricts (strict limité aux autorisations APT, ADR 005), application par fournisseur dans un ordre stable.
 - Recettes : installation/désinstallation suivies avec reçus, ressources `~/` uniquement, confiance explicite, jamais root, pkgx ne supprime jamais de chemin (ADR 008) ; `--observe` expérimental.
-- Fichiers de config gérés (ADR 013, M8) : table `files` du manifeste, `diff`/`plan -f`/`apply -f`, `pkgx file adopt|list|forget` avec sauvegardes privées ; copie d'octets uniquement, `~/` seulement, jamais de suppression. Reste : `file remove`, TUI/audit, validation sandbox.
+- Fichiers de config gérés (ADR 013, M8) : table `files` du manifeste, `diff`/`plan -f`/`apply -f`, `pkgx file adopt|list|forget|remove` avec sauvegardes privées ; copie d'octets uniquement, `~/` seulement ; sandbox `files-userns.sh` réussi. Reste : TUI/audit.
 - Nettoyage : classes safe/suggested/manual, `clean --cache` (apt-get clean / pacman -Sc) et `clean --orphans` via l’exécuteur revu (ADR 009).
 - TUI, démo, complétions, packaging déterministe ; archives locales x86_64 gnu/musl dans `dist/` (non publiées).
 
 ## Validation native (sans toucher l’hôte)
 
-Racines jetables sans privilèges dans `tests/sandbox/` (namespaces utilisateur, `unshare --map-auto`, tmpfs) : `arch-userns.sh`, `debian-userns.sh` (bookworm, noble ; sudo NOPASSWD et PAM interactif via pty), `fedora-userns.sh`, `flatpak-userns.sh`, `brew-userns.sh`, `recipe-userns.sh`. Toutes réussies le 18/10/2026 ; voir `docs/validation.md`. Le scratch /tmp est nosuid : les racines Debian vivent sur un tmpfs de namespace. Construire un binaire musl statique pour Debian/Fedora.
+Racines jetables sans privilèges dans `tests/sandbox/` (namespaces utilisateur, `unshare --map-auto`, tmpfs) : `arch-userns.sh`, `debian-userns.sh` (bookworm, noble ; sudo NOPASSWD et PAM interactif via pty), `fedora-userns.sh`, `flatpak-userns.sh`, `brew-userns.sh`, `recipe-userns.sh`, `files-userns.sh`. Toutes réussies le 18/10/2026 ; voir `docs/validation.md`. Le scratch /tmp est nosuid : les racines Debian vivent sur un tmpfs de namespace. Construire un binaire musl statique pour Debian/Fedora.
 
 ## Commandes
 
@@ -32,7 +32,7 @@ CARGO_TARGET_DIR=/tmp/pkgx-target cargo build --release --locked --offline --tar
 python3 scripts/test_package.py
 ```
 
-Dernier checkpoint : 182 tests Rust + 2 tests Python, Clippy sans avertissement.
+Dernier checkpoint : 183 tests Rust + 2 tests Python, Clippy sans avertissement.
 
 ## Travail restant
 
