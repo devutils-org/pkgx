@@ -18,6 +18,8 @@ install)
     chmod 0755 "$bin/demo-tool"
     ln -s demo-tool "$bin/dt"
     printf 'greeting = "hi"\n' > "$HOME/.config/demo-tool.toml"
+    # Undeclared side effect, visible only to --observe.
+    mkdir -p "$HOME/.cache" && printf 'log\n' > "$HOME/.cache/demo-tool.log"
     ;;
 uninstall)
     rm -f "$bin/demo-tool" "$bin/dt"
@@ -71,9 +73,10 @@ if printf 'no\n' | pkgx recipe install -f /tmp/demo.toml $state; then
     fail 'untrusted install unexpectedly ran'
 fi
 [ ! -e "$HOME/.local/bin/demo-tool" ] || fail 'unconfirmed install ran the script'
-pkgx recipe install -f /tmp/demo.toml --yes $state --json
+pkgx recipe install -f /tmp/demo.toml --yes --observe $state --json > /tmp/install.json
+grep -q 'demo-tool.log' /tmp/install.json || fail 'undeclared effect not observed'
 [ "$("$HOME/.local/bin/dt")" = demo ] || fail 'installed tool does not run'
-pkgx recipe list $state --json | grep -q '"classification":"tracked"'
+pkgx recipe list $state --json | grep -q '"classification":"observed"'
 if pkgx recipe install -f /tmp/demo.toml --yes $state; then
     fail 'duplicate install unexpectedly ran'
 fi
@@ -90,6 +93,7 @@ pkgx recipe uninstall demo-tool --yes $state --json > /tmp/uninstall.json
 grep -q '"success":true' /tmp/uninstall.json
 [ ! -e "$HOME/.local/bin/demo-tool" ] && [ ! -L "$HOME/.local/bin/dt" ] || fail 'owned files remain'
 grep -q edited "$HOME/.config/demo-tool.toml" || fail 'configuration was not retained'
+[ -e "$HOME/.cache/demo-tool.log" ] || fail 'observed path was removed'
 [ "$(pkgx recipe list $state --json)" = '{"data":[],"schema_version":1}' ] || fail 'receipt remains'
 # A pre-existing user file can never be claimed by a recipe.
 mkdir -p "$HOME/.local/bin" && printf 'mine\n' > "$HOME/.local/bin/demo-tool"

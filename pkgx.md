@@ -125,7 +125,7 @@ Planning and execution are separate: backends can propose native operations; the
 - [x] Implement each provider using the same capabilities contract. (APT, Pacman, DNF, Flatpak and Homebrew formulae; ADR 002, 007, 010–012.)
 - [x] Record provider-specific package identity and install scope (system/user where relevant).
 - [x] Handle ambiguous names and collisions with explicit provider qualification.
-- [ ] Test dependency/orphan semantics per backend, not via assumed universal behavior.
+- [x] Test dependency/orphan semantics per backend, not via assumed universal behavior. (Native orphan removal verified for Pacman and Homebrew, APT audit natively; DNF/Flatpak orphan queries are unsupported by design.)
 - [x] Add Linux distro CI and macOS Brew smoke tests.
 - [x] Document unsupported provider features and limitations.
 
@@ -138,9 +138,9 @@ Planning and execution are separate: backends can propose native operations; the
 - [x] Introduce `script` provider with explicit installation recipes (source URL, pinned version, SHA-256, interpreter, install/uninstall steps, declared resources). (Exposed as `pkgx recipe` commands, ADR 008.)
 - [x] Download scripts to temporary storage, verify checksum, require trust confirmation before execution.
 - [x] Store installation receipts and transaction metadata in a local registry.
-- [ ] Classify scripts as `tracked`, `observed` (experimental), or `unmanaged`. (tracked/tracked_incomplete/unmanaged implemented; `observed` pending with resource observation.)
+- [x] Classify scripts as `tracked`, `observed` (experimental), or `unmanaged`. (Plus `tracked_incomplete`; ADR 008.)
 - [x] Require explicit uninstall instructions; refuse automated removal if ownership is uncertain.
-- [ ] Add best-effort resource observation only behind an experimental flag; document platform and security limits.
+- [x] Add best-effort resource observation only behind an experimental flag; document platform and security limits. (`recipe install --observe`, HOME only; ADR 008.)
 - [x] Reject scripts without integrity metadata by default, with a clearly marked manual override policy if needed. (No override exists.)
 
 **Acceptance**: known recipe installs/uninstalls in a sandbox; tampered downloads fail; unknown scripts are never silently deleted; user sees what is and is not tracked.
@@ -288,7 +288,7 @@ preview is an uncertain native --print estimate; Pacman has an experimental
 executor (ADR 007) validated in a disposable user-namespace Arch root.
 M4 has strict recipe check, HTTPS/SHA-256 preparation and confirmed home-scoped
 install/uninstall with receipts (ADR 008), validated in a loopback-only sandbox;
-experimental observation of undeclared effects is not implemented. M5 classifies safe native cleanup (measured
+undeclared HOME effects can be observed experimentally (--observe). M5 classifies safe native cleanup (measured
 APT/Pacman caches), suggested cleanup (orphans) and manual review (residual records);
 confirmed native cache cleanup and reviewed orphan removal exist (ADR 009);
 residual-configuration purge remains unsupported. M6 has

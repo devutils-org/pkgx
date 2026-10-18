@@ -36,6 +36,14 @@ resources must be gone; configuration may remain and is reported for manual revi
 Success removes the receipt and its unreferenced artifact; otherwise the receipt
 stays `uninstall_incomplete`.
 
-Not implemented: experimental observation of undeclared resources (the roadmap's
-`observed` class), system-scope recipes, confinement, and integrity overrides.
-Undeclared side effects of a script are neither observed nor reversed.
+Experimental observation (`recipe install --observe`). A bounded walk of HOME
+(200 000 entries, depth 16, no symlink traversal, the receipt store excluded) runs
+before and after the install. New or changed undeclared paths, other than the
+directories created to hold declared resources, are stored in the receipt as
+`observed` and the receipt is classified `observed`. They are never owned or
+removed; uninstall reports survivors for manual review. Changes outside HOME,
+transient files and edits preserving size and mtime are not seen. Exceeding the
+bound only produces a warning.
+
+Not implemented: system-scope recipes, confinement and integrity overrides.
+Undeclared side effects are never reversed.

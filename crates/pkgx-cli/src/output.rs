@@ -120,11 +120,13 @@ fn render(value: &Value) -> String {
     }
     if value.get("retained").is_some() {
         return format!(
-            "Script success: {}\nScript status: {}\n{}{}",
+            "Script success: {}\nScript status: {}\n{}{}{}{}",
             value["success"],
             value["native_status"],
             lines(&value["errors"], "Error: "),
             lines(&value["retained"], "Retained for manual review: "),
+            lines(&value["observed"], "Observed (undeclared, not owned): "),
+            lines(&value["warnings"], "Warning: "),
         );
     }
     if value.get("native_status").is_some() {

@@ -130,7 +130,9 @@ execution; unconfirmed install refused; confirmed install created and recorded a
 file, a symlink and a configuration file (`tracked`); duplicate install refused; a
 user-modified owned file blocked uninstall without running anything; uninstall
 removed owned resources, retained the edited configuration and dropped the receipt;
-a pre-existing user file could not be claimed by a new install.
+a pre-existing user file could not be claimed by a new install. With `--observe`,
+the fixture's undeclared `~/.cache/demo-tool.log` was reported, the receipt was
+classified `observed`, and the log survived uninstall.
 
 ## Native and terminal evidence
 

@@ -8,7 +8,8 @@ SHA-256 and discards the artifact. Neither command executes a script.
 confirmation) runs the verified script as your user and records a receipt.
 `pkgx recipe uninstall NAME [--dry-run|--yes]` runs the recipe's recorded uninstall
 action after ownership checks. `pkgx recipe list` shows receipts (`tracked` or
-`tracked_incomplete`); anything else is unmanaged. `pkgx recipe forget NAME` drops a
+`tracked_incomplete`, or `observed` when the experimental `--observe` install saw
+undeclared HOME changes); anything else is unmanaged. `pkgx recipe forget NAME` drops a
 receipt without running anything or touching files. Receipts live under the state
 directory (`--state-dir`, default `$XDG_STATE_HOME/pkgx/transactions/scripts`).
 See [ADR 008](adr/008-script-receipts.md) for the ownership rules.

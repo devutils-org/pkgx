@@ -14,6 +14,8 @@
   execution with repository signature checks, verification and sudo (ADR 010).
 - Add experimental Flatpak execution: single-remote ref/commit/runtime previews,
   --no-related installs, apps-only removal and origin/commit verification (ADR 011).
+- Add experimental `recipe install --observe`: undeclared HOME changes are recorded
+  as observed (never owned or removed) and classified `observed`.
 - Add experimental Homebrew formula execution with dry-run previews, disabled
   autoremove and version verification; parse Homebrew 7 install reasons (ADR 012).
 - Fix APT parsing of Debian packages named like providers (`apt`, `flatpak`, `dnf`)

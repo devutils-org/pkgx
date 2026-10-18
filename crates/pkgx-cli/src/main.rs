@@ -232,6 +232,9 @@ enum RecipeCommand {
         dry_run: bool,
         #[arg(long, conflicts_with = "dry_run")]
         yes: bool,
+        /// Experimental: record undeclared HOME changes as observed (never owned).
+        #[arg(long)]
+        observe: bool,
     },
     /// Run a tracked recipe's own uninstall action after ownership checks.
     Uninstall {
@@ -507,7 +510,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     &load_recipe(file)?.verify_download(&runner, std::env::consts::OS)?,
                     cli.json,
                 )?,
-                RecipeCommand::Install { file, dry_run, yes } => {
+                RecipeCommand::Install {
+                    file,
+                    dry_run,
+                    yes,
+                    observe,
+                } => {
                     let recipe = load_recipe(file)?;
                     let store = store()?;
                     let home = home_directory()?;
@@ -523,7 +531,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                         "Trust and run this verified script as your user? Type yes: ",
                     )?;
                     finish_script(
-                        pkgx_core::script::install(
+                        pkgx_core::script::install_observed(
                             &runner,
                             &recipe,
                             &store,
@@ -531,6 +539,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                             std::env::consts::OS,
                             true,
                             &runner.canceled,
+                            observe,
                         )?,
                         cli.json,
                     )?;

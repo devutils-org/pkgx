@@ -23,6 +23,7 @@ struct Sim {
     /// Do not create this file on install / do not remove it on uninstall.
     skip: Option<&'static str>,
     exit: i32,
+    undeclared: bool,
     interpreted: Mutex<Vec<CommandSpec>>,
 }
 impl CommandRunner for Sim {
@@ -56,6 +57,10 @@ impl CommandRunner for Sim {
                         std::os::unix::fs::symlink("demo-tool", bin.join("dt")).unwrap();
                         fs::create_dir_all(config.parent().unwrap()).unwrap();
                         fs::write(&config, b"x = 1\n").unwrap();
+                        if self.undeclared {
+                            fs::create_dir_all(self.home.join(".cache/demo")).unwrap();
+                            fs::write(self.home.join(".cache/demo/index"), b"x").unwrap();
+                        }
                     }
                     "uninstall" => {
                         if self.skip != Some("tool") {
@@ -325,4 +330,43 @@ fn walk(path: &Path) -> Vec<PathBuf> {
     }
     out.sort();
     out
+}
+#[cfg(unix)]
+#[test]
+fn experimental_observation_reports_undeclared_effects_without_owning_them() {
+    let env = env();
+    let mut sim = sim(&env.home);
+    sim.undeclared = true;
+    fs::create_dir_all(env.home.join("Documents")).unwrap();
+    fs::write(env.home.join("Documents/unrelated"), b"user").unwrap();
+    let record = script::install_observed(
+        &sim,
+        &recipe(),
+        &env.store,
+        &env.home,
+        "linux",
+        true,
+        &AtomicBool::new(false),
+        true,
+    )
+    .unwrap();
+    assert!(record.success, "{:?}", record.errors);
+    assert_eq!(
+        record.observed,
+        vec![
+            env.home.join(".cache"),
+            env.home.join(".cache/demo"),
+            env.home.join(".cache/demo/index")
+        ]
+    );
+    assert_eq!(env.store.list().unwrap()[0].classification, "observed");
+    let record =
+        script::uninstall(&sim, &env.store, "demo-tool", true, &AtomicBool::new(false)).unwrap();
+    assert!(record.success, "{:?}", record.errors);
+    // Observed paths are reported, never removed.
+    assert!(env.home.join(".cache/demo/index").exists());
+    assert!(record
+        .observed
+        .contains(&env.home.join(".cache/demo/index")));
+    assert!(env.home.join("Documents/unrelated").exists());
 }

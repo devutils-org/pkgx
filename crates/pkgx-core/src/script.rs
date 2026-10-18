@@ -75,14 +75,21 @@ pub struct Receipt {
     pub updated_unix_secs: u64,
     pub native_status: Option<i32>,
     pub resources: Vec<TrackedResource>,
+    /// Experimental: undeclared paths under HOME created or changed while the
+    /// install ran. Observed only; never owned, claimed or removed.
+    #[serde(default)]
+    pub observed: Vec<PathBuf>,
 }
 impl Receipt {
-    /// `tracked` only when every declared resource was created by the install.
+    /// `tracked` when every declared resource was created by the install;
+    /// `observed` when, in addition, undeclared effects were seen (experimental).
     pub fn classification(&self) -> &'static str {
-        if self.status == ReceiptStatus::Installed && self.resources.iter().all(|r| r.owned()) {
+        if self.status != ReceiptStatus::Installed || !self.resources.iter().all(|r| r.owned()) {
+            "tracked_incomplete"
+        } else if self.observed.is_empty() {
             "tracked"
         } else {
-            "tracked_incomplete"
+            "observed"
         }
     }
 }
@@ -101,6 +108,9 @@ pub struct ScriptRecord {
     pub errors: Vec<String>,
     /// Paths deliberately left for manual review (configuration, residuals).
     pub retained: Vec<PathBuf>,
+    /// Experimental observation of undeclared paths (never removed by pkgx).
+    pub observed: Vec<PathBuf>,
+    pub warnings: Vec<String>,
 }
 #[derive(Debug, Serialize)]
 pub struct InstallPreview {
@@ -513,6 +523,68 @@ pub fn install(
     confirmed: bool,
     canceled: &AtomicBool,
 ) -> Result<ScriptRecord, Error> {
+    install_observed(runner, recipe, store, home, os, confirmed, canceled, false)
+}
+const OBSERVE_LIMIT: usize = 200_000;
+const OBSERVE_DEPTH: usize = 16;
+type Snapshot = std::collections::BTreeMap<PathBuf, (u64, Option<std::time::SystemTime>, bool)>;
+/// Bounded walk of HOME without following symlinks. Returns None when the bound
+/// is exceeded, in which case observation is reported as unavailable.
+fn snapshot(home: &Path, exclude: &Path) -> Option<Snapshot> {
+    let mut entries = Snapshot::new();
+    let mut stack = vec![(home.to_path_buf(), 0usize)];
+    while let Some((directory, depth)) = stack.pop() {
+        let Ok(children) = fs::read_dir(&directory) else {
+            continue;
+        };
+        for child in children.flatten() {
+            let path = child.path();
+            if path.starts_with(exclude) {
+                continue;
+            }
+            let Ok(metadata) = fs::symlink_metadata(&path) else {
+                continue;
+            };
+            let is_dir = metadata.is_dir() && !metadata.file_type().is_symlink();
+            entries.insert(
+                path.clone(),
+                (metadata.len(), metadata.modified().ok(), is_dir),
+            );
+            if entries.len() > OBSERVE_LIMIT {
+                return None;
+            }
+            if is_dir && depth < OBSERVE_DEPTH {
+                stack.push((path, depth + 1));
+            }
+        }
+    }
+    Some(entries)
+}
+fn undeclared_changes(before: &Snapshot, after: &Snapshot, declared: &[PathBuf]) -> Vec<PathBuf> {
+    after
+        .iter()
+        .filter(|(path, state)| before.get(*path) != Some(state))
+        .filter(|(path, (_, _, is_dir))| {
+            // Declared resources and the directories created to hold them are expected.
+            !declared
+                .iter()
+                .any(|d| d == *path || (*is_dir && d.starts_with(path)))
+        })
+        .map(|(path, _)| path.clone())
+        .collect()
+}
+/// `install` with optional experimental observation of undeclared HOME changes.
+#[allow(clippy::too_many_arguments)]
+pub fn install_observed(
+    runner: &dyn CommandRunner,
+    recipe: &Recipe,
+    store: &ReceiptStore,
+    home: &Path,
+    os: &str,
+    confirmed: bool,
+    canceled: &AtomicBool,
+    observe_home: bool,
+) -> Result<ScriptRecord, Error> {
     not_root()?;
     let preview = preview_install(recipe, store, home)?;
     if !confirmed {
@@ -550,6 +622,7 @@ pub fn install(
         updated_unix_secs: now()?,
         native_status: None,
         resources: declared,
+        observed: vec![],
     };
     store.save(&receipt, true)?;
     // Repeat the attribution precondition immediately before execution.
@@ -557,8 +630,23 @@ pub fn install(
         store.forget(&receipt.name)?;
         return Err(error);
     }
+    let before = observe_home
+        .then(|| snapshot(home, &store.directory))
+        .flatten();
     let (native_status, mut errors) =
         run_action(runner, &receipt, &artifact, &recipe.install, canceled);
+    let mut warnings = vec![];
+    if observe_home {
+        match (&before, snapshot(home, &store.directory)) {
+            (Some(before), Some(after)) => {
+                receipt.observed = undeclared_changes(before, &after, &preview.resolved_resources)
+            }
+            _ => warnings.push(format!(
+                "experimental observation unavailable: HOME exceeds {OBSERVE_LIMIT} entries"
+            )),
+        }
+        warnings.push("Observation covers HOME only (bounded walk, no symlink traversal); changes elsewhere, transient files and content-preserving edits are not seen.".into());
+    }
     for resource in &mut receipt.resources {
         resource.evidence = observe(&resource.path)?.unwrap_or(Evidence::Missing);
         if !resource.owned() {
@@ -588,6 +676,8 @@ pub fn install(
         status: Some(receipt.status),
         errors,
         retained: vec![],
+        observed: receipt.observed,
+        warnings,
     })
 }
 
@@ -661,6 +751,13 @@ pub fn uninstall(
             retained.push(resource.path.clone());
         }
     }
+    // Observed paths are never ours to remove; report survivors for review.
+    let observed: Vec<_> = receipt
+        .observed
+        .iter()
+        .filter(|path| fs::symlink_metadata(path).is_ok())
+        .cloned()
+        .collect();
     let success = native_status == Some(0) && errors.is_empty();
     receipt.native_status = native_status;
     receipt.updated_unix_secs = now()?;
@@ -677,5 +774,7 @@ pub fn uninstall(
         status: (!success).then_some(ReceiptStatus::UninstallIncomplete),
         errors,
         retained,
+        observed,
+        warnings: vec![],
     })
 }
