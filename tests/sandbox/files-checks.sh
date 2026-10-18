@@ -1,13 +1,20 @@
 #!/bin/sh
-# Runs only inside tests/sandbox/files-userns.sh: read-only host, private /tmp.
+# Runs inside tests/sandbox/files-userns.sh (read-only host, private /tmp), or on a
+# disposable CI runner with PKGX_DISPOSABLE=1, PKGX_BIN and PKGX_ROOT set.
 set -eu
 fail() { echo "FAIL: $1" >&2; exit 1; }
 pass() { echo "ok: $1"; }
-export HOME=/tmp/home
-mkdir -p "$HOME" /tmp/repo/dotfiles /tmp/outside
-cd /tmp/repo
-pkgx() { /tmp/bin/pkgx --state-dir /tmp/state "$@" </dev/null; }
-mode() { stat -c %a "$1"; }
+ROOT=${PKGX_ROOT:-/tmp}
+BIN=${PKGX_BIN:-/tmp/bin/pkgx}
+if [ "$ROOT" != /tmp ] && [ "${PKGX_DISPOSABLE:-}" != 1 ]; then
+    fail 'outside the sandbox, run only on a disposable runner (PKGX_DISPOSABLE=1)'
+fi
+export HOME="$ROOT/home"
+mkdir -p "$HOME" "$ROOT/repo/dotfiles" "$ROOT/outside"
+cd "$ROOT/repo"
+pkgx() { "$BIN" --state-dir "$ROOT/state" "$@" </dev/null; }
+mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+retarget() { sed "s#$1#$2#" system.toml > system.toml.new && mv system.toml.new system.toml; }
 
 printf 'set -g mouse on\n' > dotfiles/tmux.conf
 printf 'alias ll="ls -l"\n' > dotfiles/bashrc
@@ -24,17 +31,17 @@ TOML
 
 pkgx diff -f system.toml | grep -q 'file unmanaged conflict	~/.bashrc' || fail 'conflict not reported'
 pkgx diff -f system.toml | grep -q 'file missing	~/.config/tmux/tmux.conf' || fail 'missing not reported'
-if pkgx apply -f system.toml --yes 2>/tmp/err; then fail 'apply over unmanaged file'; fi
-grep -q 'unmanaged_conflict' /tmp/err || fail 'conflict refusal not named'
-[ ! -e "$HOME/.config" ] && [ ! -e /tmp/state/files ] || fail 'refused apply changed state'
+if pkgx apply -f system.toml --yes 2>$ROOT/err; then fail 'apply over unmanaged file'; fi
+grep -q 'unmanaged_conflict' $ROOT/err || fail 'conflict refusal not named'
+[ ! -e "$HOME/.config" ] && [ ! -e $ROOT/state/files ] || fail 'refused apply changed state'
 pass 'unmanaged files block apply without side effects'
 
 if pkgx file adopt "$HOME/.bashrc" 2>/dev/null; then fail 'adoption without --yes'; fi
 pkgx file adopt "$HOME/.bashrc" --yes >/dev/null
-backup=$(ls /tmp/state/files/backups)
-[ "$(cat "/tmp/state/files/backups/$backup")" = existing ] || fail 'backup content'
-[ "$(mode "/tmp/state/files/backups/$backup")" = 600 ] || fail 'backup mode'
-[ "$(mode /tmp/state/files)" = 700 ] || fail 'registry directory mode'
+backup=$(ls $ROOT/state/files/backups)
+[ "$(cat "$ROOT/state/files/backups/$backup")" = existing ] || fail 'backup content'
+[ "$(mode "$ROOT/state/files/backups/$backup")" = 600 ] || fail 'backup mode'
+[ "$(mode $ROOT/state/files)" = 700 ] || fail 'registry directory mode'
 pass 'adoption backs up privately'
 
 pkgx plan -f system.toml | grep -q '^+alias ll' || fail 'plan diff'
@@ -48,39 +55,39 @@ ls -A "$HOME" "$HOME/.config/tmux" | grep -q '\.pkgx-' && fail 'temporary file l
 pass 'apply writes atomically and is idempotent'
 
 echo '# local' >> "$HOME/.config/tmux/tmux.conf"
-if pkgx apply -f system.toml --yes 2>/tmp/err; then fail 'drift overwritten'; fi
-grep -q 'drifted' /tmp/err || fail 'drift refusal not named'
+if pkgx apply -f system.toml --yes 2>$ROOT/err; then fail 'drift overwritten'; fi
+grep -q 'drifted' $ROOT/err || fail 'drift refusal not named'
 grep -q '# local' "$HOME/.config/tmux/tmux.conf" || fail 'local edit lost'
 printf 'set -g mouse on\n# local\n' > dotfiles/tmux.conf
 pkgx diff -f system.toml | grep -q 'file in sync	~/.config/tmux/tmux.conf' || fail 'edit copied back not in sync'
 pass 'local edits are drift, never reverted'
 
-printf 'evil = 1\n' > /tmp/outside/victim
+printf 'evil = 1\n' > $ROOT/outside/victim
 cat >> system.toml <<'TOML'
 [files."~/.evil"]
 source = "dotfiles/evil"
 [files."~/linked/conf"]
 source = "dotfiles/evil"
 TOML
-ln -s /tmp/outside/victim "$HOME/.evil"
-ln -s /tmp/outside "$HOME/linked"
+ln -s $ROOT/outside/victim "$HOME/.evil"
+ln -s $ROOT/outside "$HOME/linked"
 pkgx diff -f system.toml | grep -q 'file unsupported	~/.evil' || fail 'symlink target'
 pkgx diff -f system.toml | grep -q 'file unsupported	~/linked/conf' || fail 'symlinked ancestor'
 if pkgx apply -f system.toml --yes 2>/dev/null; then fail 'apply through symlink'; fi
-[ "$(cat /tmp/outside/victim)" = 'evil = 1' ] && [ ! -e /tmp/outside/conf ] || fail 'symlink followed'
+[ "$(cat $ROOT/outside/victim)" = 'evil = 1' ] && [ ! -e $ROOT/outside/conf ] || fail 'symlink followed'
 rm "$HOME/.evil" "$HOME/linked"
-ln -s /tmp/outside/victim dotfiles/evil.link
-sed -i 's#"dotfiles/evil"#"dotfiles/evil.link"#' system.toml
+ln -s $ROOT/outside/victim dotfiles/evil.link
+retarget '"dotfiles/evil"' '"dotfiles/evil.link"'
 if pkgx diff -f system.toml 2>/dev/null; then fail 'source symlink escape'; fi
-sed -i 's#"dotfiles/evil.link"#"dotfiles/evil"#' system.toml
+retarget '"dotfiles/evil.link"' '"dotfiles/evil"'
 pass 'symlinked targets, ancestors and sources are refused'
 
-: > /tmp/state/files/lock
-chmod 600 /tmp/state/files/lock
-if pkgx apply -f system.toml --yes 2>/tmp/err; then fail 'apply while locked'; fi
-grep -q 'locked' /tmp/err || fail 'lock refusal not named'
+: > $ROOT/state/files/lock
+chmod 600 $ROOT/state/files/lock
+if pkgx apply -f system.toml --yes 2>$ROOT/err; then fail 'apply while locked'; fi
+grep -q 'locked' $ROOT/err || fail 'lock refusal not named'
 [ ! -e "$HOME/.evil" ] || fail 'locked apply wrote'
-rm /tmp/state/files/lock
+rm $ROOT/state/files/lock
 pkgx apply -f system.toml --yes >/dev/null
 [ "$(cat "$HOME/linked/conf")" = 'x = 1' ] || fail 'apply after unlock'
 pass 'a held lock refuses writes'

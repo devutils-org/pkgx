@@ -72,6 +72,7 @@ jobs:
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: cargo build --locked -p pkgx-cli
       - run: sh tests/sandbox/recipe-userns.sh target/debug/pkgx
+      - run: sh tests/sandbox/files-userns.sh "$PWD/target/debug/pkgx"
   macos-smoke:
     runs-on: macos-latest
     steps:
@@ -88,3 +89,10 @@ jobs:
         run: |
           cargo build --locked -p pkgx-cli
           PATH="$PWD/target/debug:$PATH" sh tests/containers/brew-transactions.sh
+      # Managed configuration files with a private HOME below the runner's temp.
+      - name: Validate managed configuration files on the disposable runner
+        env:
+          PKGX_DISPOSABLE: '1'
+        run: |
+          PKGX_ROOT="$RUNNER_TEMP/pkgx-files" PKGX_BIN="$PWD/target/debug/pkgx" \
+            sh tests/sandbox/files-checks.sh
