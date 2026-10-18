@@ -562,6 +562,10 @@ impl Backend for NativeBackend<'_> {
                 "--",
             ],
         );
+        if remove.is_empty() {
+            // Matches the executor: already-installed targets are not reinstalled.
+            spec.args.insert(1, "--needed".into());
+        }
         spec.args.extend(requests.iter().map(|id| id.name.clone()));
         let native = output(self.runner, spec)?;
         let mut operations = vec![];
@@ -595,12 +599,29 @@ impl Backend for NativeBackend<'_> {
                 native_detail: line.into(),
             });
         }
-        if operations.is_empty() {
+        if operations.is_empty() && !remove.is_empty() {
             return Err(Error::Parse(
                 "Pacman print produced no operation records".into(),
             ));
         }
-        Ok(Plan { operations, observed_state_fingerprint: crate::planner::inventory_token(&observed), observed_packages: observed.clone(), uncertain: true, warnings: vec!["Pacman --print is a target/dependency estimate, not a complete transaction simulation; conflict replacements and hooks are not modeled.".into(), "Pacman execution is not implemented. HoldPkg and system-critical package policy must be reviewed before an executor is added.".into()] })
+        pacman_policy(self.runner, &operations, !remove.is_empty())?;
+        let mut warnings = vec!["Pacman --print is a target/dependency estimate, not a complete transaction simulation; conflict replacements and hooks are not modeled.".into(), "Execution never refreshes sync databases or upgrades the system; dependency upgrades listed here are partial-upgrade risks to review.".into(), "Pacman cannot pin reviewed versions; execution pins the reviewed repository and verifies installed versions afterwards.".into()];
+        if remove.is_empty() {
+            for id in install {
+                if !operations.iter().any(|op| op.package.name == id.name) {
+                    warnings.push(format!("{id} is already installed; --needed leaves it and its install reason unchanged."));
+                }
+            }
+        } else {
+            warnings.push("Removal uses pacman --remove without --recursive or --cascade; dependencies stay installed and modified configuration files are kept as native .pacsave backups.".into());
+        }
+        Ok(Plan {
+            operations,
+            observed_state_fingerprint: crate::planner::inventory_token(&observed),
+            observed_packages: observed.clone(),
+            uncertain: true,
+            warnings,
+        })
     }
     fn orphan_candidates(&self) -> Result<Vec<PackageId>, Error> {
         let names = match self.provider {
@@ -718,4 +739,70 @@ impl Backend for NativeBackend<'_> {
         }
         Ok(results)
     }
+}
+
+/// Packages pkgx never removes through Pacman, even when HoldPkg is empty.
+pub const PACMAN_CRITICAL: &[&str] = &["pacman", "glibc", "filesystem"];
+fn pacman_conf(runner: &dyn CommandRunner, key: &str) -> Result<Vec<String>, Error> {
+    Ok(output(runner, CommandSpec::new("pacman-conf", &[key]))?
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect())
+}
+/// pacman-conf patterns use fnmatch; only `*` and `?` are evaluated, and any
+/// other glob syntax fails closed instead of guessing.
+fn pacman_pattern(pattern: &str, name: &str) -> Result<bool, Error> {
+    if pattern.contains(['[', ']', '\\', '!']) {
+        return Err(Error::Safety(format!(
+            "pacman pattern {pattern:?} uses unsupported glob syntax; review it manually"
+        )));
+    }
+    fn matches(p: &[u8], n: &[u8]) -> bool {
+        match (p.first(), n.first()) {
+            (None, None) => true,
+            (Some(b'*'), _) => matches(&p[1..], n) || (!n.is_empty() && matches(p, &n[1..])),
+            (Some(b'?'), Some(_)) => matches(&p[1..], &n[1..]),
+            (Some(a), Some(b)) if a == b => matches(&p[1..], &n[1..]),
+            _ => false,
+        }
+    }
+    Ok(matches(pattern.as_bytes(), name.as_bytes()))
+}
+/// Refuse what pacman would otherwise decide through prompts answered by
+/// --noconfirm: held removals and installation of ignored packages/groups.
+fn pacman_policy(
+    runner: &dyn CommandRunner,
+    operations: &[Operation],
+    removing: bool,
+) -> Result<(), Error> {
+    if removing {
+        let mut held = pacman_conf(runner, "HoldPkg")?;
+        held.extend(PACMAN_CRITICAL.iter().map(|s| (*s).to_owned()));
+        for op in operations {
+            for pattern in &held {
+                if pacman_pattern(pattern, &op.package.name)? {
+                    return Err(Error::Safety(format!(
+                        "{} is protected by HoldPkg or pkgx critical-package policy",
+                        op.package
+                    )));
+                }
+            }
+        }
+    } else if !operations.is_empty() {
+        if !pacman_conf(runner, "IgnoreGroup")?.is_empty() {
+            return Err(Error::Safety("IgnoreGroup is configured; group membership is not evaluated, so Pacman installation is refused".into()));
+        }
+        let ignored = pacman_conf(runner, "IgnorePkg")?;
+        for op in operations {
+            for pattern in &ignored {
+                if pacman_pattern(pattern, &op.package.name)? {
+                    return Err(Error::Safety(format!(
+                        "{} matches IgnorePkg; pkgx does not override native ignore policy",
+                        op.package
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
 }

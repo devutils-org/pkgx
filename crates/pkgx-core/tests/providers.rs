@@ -180,11 +180,14 @@ fn pacman_print_is_an_uncertain_preview_not_an_executable_plan() {
             _: Duration,
             _: &AtomicBool,
         ) -> Result<CommandOutput, Error> {
-            assert_eq!(spec.program, "pacman");
-            let text = if spec.args.contains(&"-Qi".into()) {
+            let text = if spec.program == "pacman-conf" {
+                ""
+            } else if spec.args.contains(&"-Qi".into()) {
                 include_str!("../../../tests/fixtures/pacman-info.txt")
             } else {
+                assert_eq!(spec.program, "pacman");
                 assert!(spec.args.contains(&"--print".into()));
+                assert!(spec.args.contains(&"--needed".into()));
                 assert!(!spec.args.contains(&"--refresh".into()));
                 "curl\t8.10.1-1\tx86_64\tcore\n"
             };

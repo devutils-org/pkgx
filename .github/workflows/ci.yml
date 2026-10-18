@@ -41,10 +41,11 @@ jobs:
     strategy:
       matrix:
         include:
+          # The disposable Arch container needs sync databases before checks.
           - image: archlinux:base
-            check: pacman.sh
+            check: pacman -Sy --noconfirm && sh /checks/pacman.sh && sh /checks/pacman-transactions.sh
           - image: fedora:latest
-            check: rpm.sh
+            check: sh /checks/rpm.sh
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -60,7 +61,7 @@ jobs:
           docker run --rm \
             -v "$PWD/target/x86_64-unknown-linux-musl/release/pkgx:/usr/local/bin/pkgx:ro" \
             -v "$PWD/tests/containers:/checks:ro" \
-            "$CONTAINER_IMAGE" sh "/checks/$CONTAINER_CHECK"
+            "$CONTAINER_IMAGE" sh -c "$CONTAINER_CHECK"
   macos-smoke:
     runs-on: macos-latest
     steps:

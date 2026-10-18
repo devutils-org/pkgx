@@ -1,4 +1,4 @@
-//! Explicit delegation of one reviewed APT transaction; never elevate inspection.
+//! Explicit delegation of one reviewed native transaction; never elevate inspection.
 use crate::{
     command::{CommandOutput, CommandRunner, CommandSpec, ProcessRunner},
     Error, Plan,
@@ -14,6 +14,7 @@ use std::{
 
 pub const SUDO: &str = "/usr/bin/sudo";
 pub const APT: &str = "/usr/bin/apt-get";
+pub const PACMAN: &str = "/usr/bin/pacman";
 pub trait SudoAuthenticator {
     fn authenticate(&self, canceled: &AtomicBool) -> Result<(), Error>;
 }
@@ -62,29 +63,61 @@ impl CommandRunner for SudoAptRunner<'_> {
         if !spec.requires_privilege {
             return self.runner.run(spec, timeout, canceled);
         }
-        if spec.program != "apt-get"
-            || !spec.env.is_empty()
-            || !spec.args.iter().any(|a| a == "--yes")
-            || !spec.args.iter().any(|a| a == "install")
-            || !spec.args.iter().any(|a| a == "--")
-            || spec
-                .args
-                .iter()
-                .any(|a| a == "--simulate" || a == "--version")
-        {
-            return Err(Error::Safety("sudo delegation accepts only an executor-marked APT transaction with no environment overrides".into()));
+        if !spec.env.is_empty() {
+            return Err(Error::Safety(
+                "sudo delegation refuses environment overrides".into(),
+            ));
         }
-        let mut elevated = CommandSpec::new(SUDO, &["-n", "-u", "root", "--", APT]);
+        let program = match spec.program.as_str() {
+            "apt-get"
+                if spec.args.iter().any(|a| a == "--yes")
+                    && spec.args.iter().any(|a| a == "install")
+                    && spec.args.iter().any(|a| a == "--")
+                    && !spec
+                        .args
+                        .iter()
+                        .any(|a| a == "--simulate" || a == "--version") =>
+            {
+                APT
+            }
+            "pacman" if pacman_transaction(&spec.args) => PACMAN,
+            _ => return Err(Error::Safety("sudo delegation accepts only an executor-marked APT or Pacman transaction with no environment overrides".into())),
+        };
+        let mut elevated = CommandSpec::new(SUDO, &["-n", "-u", "root", "--", program]);
         elevated.args.extend(spec.args.iter().cloned());
         elevated.termination_grace = Duration::from_secs(3);
         self.runner.run(&elevated, timeout, canceled)
     }
 }
 
-pub struct ProcessSudoAuthenticator;
+/// Exactly an executor template followed by non-option targets.
+fn pacman_transaction(args: &[String]) -> bool {
+    [
+        crate::execution::PACMAN_INSTALL,
+        crate::execution::PACMAN_REMOVE,
+    ]
+    .iter()
+    .any(|template| {
+        let prefix = &template[1..];
+        args.len() > prefix.len()
+            && args.iter().zip(prefix.iter()).all(|(a, b)| a == b)
+            && args[prefix.len()..]
+                .iter()
+                .all(|target| !target.is_empty() && !target.starts_with('-'))
+    })
+}
+/// Authenticates for the provider whose system binary the transaction uses.
+pub struct ProcessSudoAuthenticator {
+    pub provider: crate::ProviderId,
+}
+impl ProcessSudoAuthenticator {
+    pub const APT: Self = Self {
+        provider: crate::ProviderId::Apt,
+    };
+}
 impl SudoAuthenticator for ProcessSudoAuthenticator {
     fn authenticate(&self, canceled: &AtomicBool) -> Result<(), Error> {
-        verify_environment()?;
+        verify_environment(self.provider)?;
         if canceled.load(Ordering::Relaxed) {
             return Err(Error::Canceled("sudo authorization".into()));
         }
@@ -118,7 +151,7 @@ fn authorization_status(status: Option<i32>) -> Result<(), Error> {
     if status == Some(0) {
         Ok(())
     } else {
-        Err(Error::Safety("sudo authorization failed; use an interactive terminal or obtain sudo authorization first; no APT transaction started".into()))
+        Err(Error::Safety("sudo authorization failed; use an interactive terminal or obtain sudo authorization first; no native transaction started".into()))
     }
 }
 /// Require the same system APT executable used by inspection; sudo's secure_path
@@ -130,7 +163,7 @@ pub fn validate_environment(
 ) -> Result<(), Error> {
     if resolved_apt != expected_apt {
         return Err(Error::Safety(
-            "--sudo requires the system /usr/bin/apt-get selected on PATH".into(),
+            "--sudo requires the system package-manager binary selected on PATH".into(),
         ));
     }
     if !overrides.is_empty() {
@@ -138,21 +171,36 @@ pub fn validate_environment(
     }
     Ok(())
 }
-fn verify_environment() -> Result<(), Error> {
+fn verify_environment(provider: crate::ProviderId) -> Result<(), Error> {
     if std::env::consts::OS != "linux" {
         return Err(Error::Unsupported(
-            "sudo APT execution requires Linux".into(),
+            "sudo native execution requires Linux".into(),
         ));
     }
-    let expected = std::fs::canonicalize(APT).map_err(|source| Error::Io {
-        program: "system apt-get".into(),
+    let (binary, system, variables): (&str, &str, &[&str]) = match provider {
+        crate::ProviderId::Apt => (
+            "apt-get",
+            APT,
+            &["APT_CONFIG", "DPKG_ROOT", "DPKG_ADMINDIR"],
+        ),
+        crate::ProviderId::Pacman => ("pacman", PACMAN, &[]),
+        _ => {
+            return Err(Error::Unsupported(format!(
+                "sudo delegation for {provider}"
+            )))
+        }
+    };
+    let expected = std::fs::canonicalize(system).map_err(|source| Error::Io {
+        program: format!("system {binary}"),
         source,
     })?;
     let path = std::env::var_os("PATH").ok_or_else(|| {
-        Error::Safety("--sudo requires a trusted PATH selecting system apt-get".into())
+        Error::Safety(format!(
+            "--sudo requires a trusted PATH selecting system {binary}"
+        ))
     })?;
     let selected: PathBuf = std::env::split_paths(&path)
-        .map(|dir| dir.join("apt-get"))
+        .map(|dir| dir.join(binary))
         .find(|path| {
             let Ok(metadata) = std::fs::metadata(path) else {
                 return false;
@@ -170,13 +218,14 @@ fn verify_environment() -> Result<(), Error> {
                 true
             }
         })
-        .ok_or_else(|| Error::Safety("apt-get is absent from PATH".into()))?;
+        .ok_or_else(|| Error::Safety(format!("{binary} is absent from PATH")))?;
     let selected = std::fs::canonicalize(selected).map_err(|source| Error::Io {
-        program: "selected apt-get".into(),
+        program: format!("selected {binary}"),
         source,
     })?;
-    let overrides = ["APT_CONFIG", "DPKG_ROOT", "DPKG_ADMINDIR"]
-        .into_iter()
+    let overrides = variables
+        .iter()
+        .copied()
         .filter(|key| std::env::var_os(key).is_some())
         .collect::<Vec<_>>();
     validate_environment(&selected, &expected, &overrides)
@@ -217,7 +266,7 @@ fn stop_authentication(mut child: Child) -> Result<(), Error> {
         thread::sleep(Duration::from_millis(10));
     }
     let _ = child.kill();
-    crate::command::reap_bounded(child).map_err(|_| Error::Safety("sudo authorization could not be stopped; its process may still be running; no APT transaction started".into()))
+    crate::command::reap_bounded(child).map_err(|_| Error::Safety("sudo authorization could not be stopped; its process may still be running; no native transaction started".into()))
 }
 
 fn wait_authentication(
@@ -230,13 +279,13 @@ fn wait_authentication(
         if canceled.load(Ordering::Relaxed) {
             stop_authentication(child)?;
             return Err(Error::Canceled(
-                "sudo authorization; no APT transaction started".into(),
+                "sudo authorization; no native transaction started".into(),
             ));
         }
         if start.elapsed() >= timeout {
             stop_authentication(child)?;
             return Err(Error::Timeout(
-                "sudo authorization; no APT transaction started".into(),
+                "sudo authorization; no native transaction started".into(),
             ));
         }
         match child.try_wait() {

@@ -4,7 +4,7 @@
 | --- | --- | --- | --- |
 | Linux Rust stable | fmt, clippy, unit/integration fixtures | Ubuntu build/checks | No native version matrix yet |
 | Debian Bookworm / Ubuntu 24.04 APT | Injected-runner tests | Disposable inspection + transactions | Pending CI |
-| Arch Pacman | Fixtures + read-only Pacman 7.1.0 inventory/deps/why (301 packages) | Disposable inspection | Pending CI |
+| Arch Pacman | Fixtures + injected executor tests + disposable user-namespace Arch root: inspection and transactions (tests/sandbox/arch-userns.sh) | Disposable inspection + transactions | Pending CI |
 | Fedora RPM/DNF | Native-output fixture tests | Disposable inspection | Pending CI |
 | Flatpak default user/system | Scoped injected-runner tests | Not yet configured | No |
 | macOS Homebrew | JSON fixture tests | macOS build + inventory smoke | Pending CI |
@@ -13,8 +13,9 @@
 | Script recipes | Metadata + simulated checksum/tamper tests | Unit tests | Execution unsupported |
 
 Docker/Podman and APT are absent in the local development sandbox. Pacman 7.1.0
-is available and was used only for read-only inventory, dependency and provenance
-smoke tests; no native package transaction was run. No native host package transaction, downloaded script or cleanup operation
+on the host was used only for read-only inventory, dependency, provenance and
+preview checks. Pacman transactions ran only inside a disposable root created by
+tests/sandbox/arch-userns.sh in an unprivileged user namespace. No native host package transaction, downloaded script or cleanup operation
 has been run. Configuring CI does not count as a successful CI run.
 
 Build locally using Rust stable: `cargo build --release --locked -p pkgx-cli`.

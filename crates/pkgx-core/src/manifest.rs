@@ -68,10 +68,16 @@ fn validate_packages(packages: &BTreeMap<String, PackageSelection>) -> Result<()
         }
         let mut seen = BTreeSet::new();
         for name in &selection.install {
-            if name.starts_with(&format!("{provider}:")) {
-                return Err(Error::InvalidInput(
-                    "manifest names are already provider-scoped; omit the provider prefix".into(),
-                ));
+            // A package may share its provider's name (pacman:x86_64, apt:amd64);
+            // that reading needs a known architecture, otherwise it is a prefix.
+            if let Some(rest) = name.strip_prefix(&format!("{provider}:")) {
+                let first = rest.split(':').next().unwrap_or_default();
+                if !crate::identity::known_scope(provider, first) || rest.contains(':') {
+                    return Err(Error::InvalidInput(
+                        "manifest names are already provider-scoped; omit the provider prefix"
+                            .into(),
+                    ));
+                }
             }
             let id = parse_name(provider, name)?;
             if !seen.insert(id.to_string()) {

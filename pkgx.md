@@ -284,7 +284,8 @@ private atomic transaction journals, additive manifests and explicit managed-onl
 profile/platform composition, mixed-provider preflight and provider-aware diff.
 
 M3 has consultation adapters for Pacman, RPM/DNF, Flatpak and Homebrew. Pacman
-preview is an uncertain native --print estimate. Execution remains APT-only.
+preview is an uncertain native --print estimate; Pacman has an experimental
+executor (ADR 007) validated in a disposable user-namespace Arch root.
 M4 has strict recipe check and HTTPS/SHA-256 preparation with no interpreter
 execution, receipts or automatic uninstall. M5 has native orphan audit previews
 and read-only clean, plus native residual-configuration record inspection;

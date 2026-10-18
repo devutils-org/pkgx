@@ -2,6 +2,13 @@
 
 ## 0.1.0 — unreleased
 
+- Add experimental confirmed Pacman execution: --needed previews, HoldPkg/IgnorePkg
+  and critical-package policy, repository pinning, version verification, journals,
+  saved plans, TUI and exact-template sudo delegation (ADR 007).
+- Apply mixed manifests as one reviewed transaction per executable provider.
+- Fix export/diff of packages named like their provider (`pacman`, `apt`).
+- Add a disposable user-namespace Arch root for native Pacman validation.
+
 - Initialize Rust workspace, package identity and plan models.
 - Add controlled subprocess runner and provider binary diagnostics.
 - Add read-only APT inventory with architecture and native installation marks.

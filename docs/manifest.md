@@ -52,7 +52,8 @@ Multiple versions of one identity collapse to one presence requirement. Writes t
 Unavailable providers fail explicitly. `plan -f` assembles native plans in stable
 provider order; unsupported missing-package operations fail. `apply -f` checks all
 provider inventories first and refuses if any missing identity has no executor,
-before changing any provider. Currently only APT can execute. A complete mixed
+before changing any provider. APT and Pacman can execute; each provider is a
+separate reviewed transaction in stable order, stopping at the first failure. A complete mixed
 manifest is a successful no-op. Existing versions satisfy presence; version sync is
 not supported. Additive mode retains all undeclared software. Strict mode retains
 all ungranted identities and refuses native removal cascades outside its scope.

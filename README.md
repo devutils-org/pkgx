@@ -37,13 +37,14 @@ only explicitly granted APT identities; it refuses native cascades outside that 
 Implemented native consultation: APT, Pacman, RPM/DNF, default Flatpak user/system,
 and Homebrew formulae/casks. Identities preserve provider, architecture and scope.
 APT supports native simulation and experimental execution. Pacman supports an
-explicitly uncertain --print preview. Other native solvers/executors are unsupported;
+explicitly uncertain --print preview and experimental confirmed execution (ADR 007).
+Other native solvers/executors are unsupported;
 there is no implicit provider fallback. See [backend matrix](docs/backends.md).
 
-`install`, `remove` and `apply` execute APT only after a preview and interactive `yes`,
+`install`, `remove` and `apply` execute APT or Pacman only after a preview and interactive `yes`,
 or explicit --yes. Noninteractive execution without --yes is refused. Revalidation
 follows confirmation. Execution requires native privileges; explicit --sudo can
-delegate the reviewed APT transaction without elevating inspection or pkgx state.
+delegate the reviewed APT/Pacman transaction without elevating inspection or pkgx state.
 A private transaction journal records intent and verified results. Saved plans expire
 and must match a fresh native plan before execution; see [saved-plan policy](docs/adr/004-saved-plan-review.md). SIGINT/SIGTERM
 cancels subprocess work on Unix. Partial failures never imply rollback.

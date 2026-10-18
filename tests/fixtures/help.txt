@@ -10,8 +10,8 @@ Commands:
   info         Inspect package records; non-APT adapters require an installed package
   why          Report native installation reason and its provenance limits
   deps         Inspect installed native dependency expressions without resolving a graph
-  install      Preview or confirm an installation (execution supports APT only)
-  remove       Preview or confirm a removal (execution supports APT only)
+  install      Preview or confirm an installation (execution supports APT and Pacman)
+  remove       Preview or confirm a removal (execution supports APT and Pacman)
   plan         Preview a qualified package operation or a resolved manifest
   export       Export installed identities to an additive TOML manifest
   diff         Report provider-scoped manifest drift without changing packages
@@ -29,7 +29,7 @@ Commands:
 
 Options:
       --json                   Print versioned JSON results (export and completions emit native text)
-      --sudo                   Use sudo only for confirmed APT execution; previews stay unprivileged
+      --sudo                   Use sudo only for confirmed APT/Pacman execution; previews stay unprivileged
       --state-dir <STATE_DIR>  Dedicated private transaction directory; inspection never creates it
       --profile <PROFILE>      Select a manifest profile; repeat to compose several profiles
   -h, --help                   Print help

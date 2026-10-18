@@ -165,3 +165,23 @@ fn multi_provider_preflight_rejects_missing_or_duplicate_backend_before_query() 
         Err(pkgx_core::Error::Unavailable(_))
     ));
 }
+#[test]
+fn packages_named_like_their_provider_round_trip_through_export() {
+    // Found by the disposable Arch root: the `pacman` package itself was
+    // mistaken for a redundant provider prefix and broke export -> diff.
+    let mut observed = apt::parse_inventory("apt\tamd64\t1\tinstalled\n").unwrap();
+    observed.extend(
+        pkgx_core::providers::parse_pacman(
+            "Name            : pacman\nVersion         : 7.1.0-1\nArchitecture    : x86_64\nInstall Reason  : Explicitly installed\n",
+        )
+        .unwrap(),
+    );
+    let exported = DesiredState::export(&observed).unwrap();
+    let state = DesiredState::parse(&exported).unwrap();
+    let diff = state.diff(&observed).unwrap();
+    assert!(diff.missing.is_empty());
+    assert_eq!(diff.present.len(), 2);
+    let prefixed =
+        DesiredState::parse("version = 1\n[packages.pacman]\ninstall = ['pacman:curl:x86_64']");
+    assert!(prefixed.is_err_and(|e| e.to_string().contains("provider prefix")));
+}

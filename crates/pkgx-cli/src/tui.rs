@@ -1,4 +1,4 @@
-//! Read-only by default; experimental APT execution requires an opt-in and typed review.
+//! Read-only by default; experimental APT/Pacman execution requires an opt-in and typed review.
 mod theme;
 
 use crossterm::{
@@ -44,7 +44,7 @@ Cached preview reads the inventory; Enter queries native metadata.
 DEMO means synthetic data, with no native planning or execution.
 
 EXECUTION
-x: review confirmation (requires --allow-apply and an APT plan)
+x: review confirmation (requires --allow-apply and an APT or Pacman plan)
 Type apply and press Enter to execute.
 
 HELP
@@ -56,6 +56,15 @@ struct Pending {
     plan: Plan,
     install: Vec<PackageId>,
     remove: Vec<PackageId>,
+}
+impl Pending {
+    fn provider(&self) -> Option<ProviderId> {
+        self.install
+            .iter()
+            .chain(&self.remove)
+            .next()
+            .map(|id| id.provider)
+    }
 }
 #[derive(Default)]
 struct Browser {
@@ -157,19 +166,22 @@ impl Browser {
         let Some(pending) = &self.pending else {
             return false;
         };
+        let Some(provider) = pending.provider() else {
+            return false;
+        };
         if !self.allow_apply
-            || (pending.install.is_empty() && pending.remove.is_empty())
+            || !pkgx_core::execution::executable(provider)
             || pending
                 .plan
                 .operations
                 .iter()
-                .any(|op| op.package.provider != ProviderId::Apt)
+                .any(|op| op.package.provider != provider)
             || pending.plan.operations.is_empty()
             || pending
                 .install
                 .iter()
                 .chain(&pending.remove)
-                .any(|id| id.provider != ProviderId::Apt)
+                .any(|id| id.provider != provider)
         {
             return false;
         }
@@ -248,9 +260,9 @@ impl Browser {
         let notice = if self.demo {
             super::demo::NOTICE
         } else if self.allow_apply && self.sudo_requested {
-            "Experimental APT execution · sudo after confirmation · x reviews the plan"
+            "Experimental native execution · sudo after confirmation · x reviews the plan"
         } else if self.allow_apply {
-            "Experimental APT execution enabled · x review · type apply to execute"
+            "Experimental native execution enabled · x review · type apply to execute"
         } else {
             "Read-only · native execution requires --allow-apply"
         };
@@ -409,7 +421,7 @@ impl Browser {
     }
     fn draw_content(&self, frame: &mut Frame, area: Rect) {
         let title = if self.confirming {
-            " Confirm APT execution ".into()
+            " Confirm native execution ".into()
         } else if self.filtering {
             " Search packages ".into()
         } else if self.page.is_some() {
@@ -781,7 +793,7 @@ pub fn run(
             }
             KeyCode::Char('x') => {
                 if !browser.arm() {
-                    browser.set_page(Ok("Execution is unavailable: enable --allow-apply and review a nonempty APT plan first. Other providers have no executor.".into()));
+                    browser.set_page(Ok("Execution is unavailable: enable --allow-apply and review a nonempty APT or Pacman plan first. Other providers have no executor.".into()));
                     browser.clear_review();
                 }
             }
@@ -823,7 +835,13 @@ pub fn run(
                         .iter()
                         .filter(|p| !p.plan.operations.is_empty())
                         .collect();
-                    if actionable.len() == 1 && actionable[0].provider == ProviderId::Apt {
+                    // Strict grants exist for APT only; additive plans may target
+                    // any provider with an executor.
+                    if actionable.len() == 1
+                        && pkgx_core::execution::executable(actionable[0].provider)
+                        && (managed.is_none() || actionable[0].provider == ProviderId::Apt)
+                    {
+                        let provider = actionable[0].provider;
                         browser.pending = Some(Pending {
                             managed,
                             plan: actionable[0].plan.clone(),
@@ -831,7 +849,7 @@ pub fn run(
                                 .diff
                                 .missing
                                 .iter()
-                                .filter(|id| id.provider == ProviderId::Apt)
+                                .filter(|id| id.provider == provider)
                                 .cloned()
                                 .collect(),
                             remove: review.diff.removals.clone(),
@@ -929,7 +947,9 @@ fn apply_pending(
         disable_raw_mode()?;
         execute!(io::stdout(), LeaveAlternateScreen, crossterm::cursor::Show)?;
         let authorization = pkgx_core::privilege::authorize_apt(
-            &pkgx_core::privilege::ProcessSudoAuthenticator,
+            &pkgx_core::privilege::ProcessSudoAuthenticator {
+                provider: pending.provider().unwrap_or(ProviderId::Apt),
+            },
             true,
             &pending.plan,
             true,
@@ -970,7 +990,7 @@ fn apply_pending(
                     &guard,
                 )
             } else {
-                pkgx_core::execution::apply_apt_recorded(
+                pkgx_core::execution::apply_recorded(
                     execution_runner,
                     &pending.plan,
                     &pending.install,
@@ -988,7 +1008,7 @@ fn apply_pending(
             completed: false,
         };
         while !worker.is_finished() {
-            browser.page=Some(format!("Applying reviewed APT transaction… {} seconds\nCtrl-C cancels; a canceled native transaction can leave partial changes.\n",started.elapsed().as_secs()));
+            browser.page=Some(format!("Applying reviewed native transaction… {} seconds\nCtrl-C cancels; a canceled native transaction can leave partial changes.\n",started.elapsed().as_secs()));
             terminal.draw(|frame| browser.draw(frame))?;
             if event::poll(Duration::from_millis(100))? {
                 if let Event::Key(key) = event::read()? {
@@ -1333,6 +1353,21 @@ mod tests {
         assert!(!browser.confirm_key(KeyCode::Esc));
         assert!(!browser.confirm_key(KeyCode::Enter));
         browser.pending = Some(pending(ProviderId::Pacman));
+        assert!(browser.arm());
+        browser.confirm_key(KeyCode::Esc);
+        let mut mixed = pending(ProviderId::Pacman);
+        mixed.plan.operations[0].package.provider = ProviderId::Apt;
+        browser.pending = Some(mixed);
+        assert!(!browser.arm());
+        let flatpak = pkgx_core::identity::parse_name(
+            ProviderId::Flatpak,
+            "app/org.example.App/x86_64/stable:user",
+        )
+        .unwrap();
+        let mut unsupported = pending(ProviderId::Apt);
+        unsupported.plan.operations[0].package = flatpak.clone();
+        unsupported.install = vec![flatpak];
+        browser.pending = Some(unsupported);
         assert!(!browser.arm());
         browser.pending = Some(pending(ProviderId::Apt));
         browser.pending.as_mut().unwrap().plan.operations.clear();

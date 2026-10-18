@@ -208,7 +208,31 @@ fn apply_apt_guarded(
     for id in remove {
         spec.args.push(format!("{}-", apt::native_name(id)?));
     }
-    let journal_id = journal.map(|journal| journal.begin(&current)).transpose()?;
+    run_verified(
+        runner,
+        &backend,
+        &current,
+        &spec,
+        canceled,
+        journal,
+        guard,
+        &|operation| planned_version(&operation.native_detail).map(str::to_owned),
+    )
+}
+/// Journal intent, run one executor-built native command and verify every
+/// planned action plus the untouched inventory afterwards.
+#[allow(clippy::too_many_arguments)]
+fn run_verified(
+    runner: &dyn CommandRunner,
+    backend: &dyn Backend,
+    current: &Plan,
+    spec: &CommandSpec,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+    guard: Option<&dyn Fn() -> Result<(), Error>>,
+    expected_version: &dyn Fn(&crate::Operation) -> Option<String>,
+) -> Result<ExecutionRecord, Error> {
+    let journal_id = journal.map(|journal| journal.begin(current)).transpose()?;
     if let Some(check) = guard {
         if let Err(error) = check() {
             let mut record = ExecutionRecord {
@@ -230,7 +254,7 @@ fn apply_apt_guarded(
             return Ok(record);
         }
     }
-    let output = runner.run(&spec, Duration::from_secs(1800), canceled);
+    let output = runner.run(spec, Duration::from_secs(1800), canceled);
     let mut errors = vec![];
     let native_status = match output {
         Ok(output) => {
@@ -277,11 +301,11 @@ fn apply_apt_guarded(
                         }
                     }
                     OperationKind::Install | OperationKind::Configure => {
-                        let expected = planned_version(&operation.native_detail);
+                        let expected = expected_version(operation);
                         if !observed
                             .iter()
                             .filter(|p| matches(&operation.package, p))
-                            .any(|p| expected == Some(p.version.as_str()))
+                            .any(|p| expected.as_deref() == Some(p.version.as_str()))
                         {
                             verified = false;
                         }
@@ -342,6 +366,225 @@ fn apply_apt_guarded(
         }
     }
     Ok(record)
+}
+/// Providers with a reviewed native executor. Others stay preview-only.
+pub fn executable(provider: crate::ProviderId) -> bool {
+    matches!(provider, crate::ProviderId::Apt | crate::ProviderId::Pacman)
+}
+fn single_provider(
+    install: &[PackageId],
+    remove: &[PackageId],
+) -> Result<crate::ProviderId, Error> {
+    let mut requests = install.iter().chain(remove);
+    let provider = requests
+        .next()
+        .ok_or_else(|| Error::InvalidInput("no package requested".into()))?
+        .provider;
+    if requests.any(|id| id.provider != provider) {
+        return Err(Error::Safety(
+            "one native transaction cannot span several providers".into(),
+        ));
+    }
+    Ok(provider)
+}
+/// Dispatch to the provider's executor without any provider fallback.
+pub fn apply_recorded(
+    runner: &dyn CommandRunner,
+    preview: &Plan,
+    install: &[PackageId],
+    remove: &[PackageId],
+    confirmed: bool,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+) -> Result<ExecutionRecord, Error> {
+    match single_provider(install, remove)? {
+        crate::ProviderId::Apt => apply_apt_recorded(
+            runner, preview, install, remove, confirmed, canceled, journal,
+        ),
+        crate::ProviderId::Pacman => apply_pacman_guarded(
+            runner, preview, install, remove, confirmed, canceled, journal, None,
+        ),
+        provider => Err(Error::Unsupported(format!(
+            "{provider} execution; no provider fallback is performed"
+        ))),
+    }
+}
+/// Saved previews of any executable provider, revalidated for expiry at every guard.
+pub fn apply_saved(
+    runner: &dyn CommandRunner,
+    saved: &crate::saved_plan::SavedPlan,
+    confirmed: bool,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+) -> Result<ExecutionRecord, Error> {
+    if single_provider(&saved.install, &saved.remove)? != saved.provider {
+        return Err(Error::Safety(
+            "saved plan requests do not match its provider".into(),
+        ));
+    }
+    match saved.provider {
+        crate::ProviderId::Apt => apply_saved_apt(runner, saved, confirmed, canceled, journal),
+        crate::ProviderId::Pacman => {
+            let check = || saved.validate_at(unix_now()?);
+            apply_pacman_guarded(
+                runner,
+                &saved.plan,
+                &saved.install,
+                &saved.remove,
+                confirmed,
+                canceled,
+                journal,
+                Some(&check),
+            )
+        }
+        provider => Err(Error::Unsupported(format!(
+            "saved-plan execution for {provider}"
+        ))),
+    }
+}
+fn unix_now() -> Result<u64, Error> {
+    Ok(std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| Error::Safety("system clock predates Unix epoch".into()))?
+        .as_secs())
+}
+pub fn apply_pacman_recorded(
+    runner: &dyn CommandRunner,
+    preview: &Plan,
+    install: &[PackageId],
+    remove: &[PackageId],
+    confirmed: bool,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+) -> Result<ExecutionRecord, Error> {
+    apply_pacman_guarded(
+        runner, preview, install, remove, confirmed, canceled, journal, None,
+    )
+}
+/// Pacman cannot pin versions. The executor repeats the --print preview and
+/// policy checks, pins the reviewed repository, never refreshes databases and
+/// verifies installed versions against the reviewed preview afterwards.
+#[allow(clippy::too_many_arguments)]
+fn apply_pacman_guarded(
+    runner: &dyn CommandRunner,
+    preview: &Plan,
+    install: &[PackageId],
+    remove: &[PackageId],
+    confirmed: bool,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+    guard: Option<&dyn Fn() -> Result<(), Error>>,
+) -> Result<ExecutionRecord, Error> {
+    if let Some(check) = guard {
+        check()?;
+    }
+    if canceled.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(Error::Canceled("Pacman execution".into()));
+    }
+    if !confirmed {
+        return Err(Error::Safety(
+            "execution requires explicit confirmation".into(),
+        ));
+    }
+    if single_provider(install, remove)? != crate::ProviderId::Pacman {
+        return Err(Error::InvalidInput("provider mismatch".into()));
+    }
+    let backend = crate::providers::NativeBackend {
+        provider: crate::ProviderId::Pacman,
+        runner,
+    };
+    let current = backend.plan(install, remove)?;
+    if &current != preview {
+        return Err(Error::Safety(
+            "plan is stale; inspect a new plan before applying".into(),
+        ));
+    }
+    if let Some(check) = guard {
+        check()?;
+    }
+    if current.operations.is_empty() {
+        return Ok(ExecutionRecord {
+            success: true,
+            native_status: None,
+            verified: true,
+            errors: vec![],
+            rollback_attempted: false,
+            observed_before: current.observed_state_fingerprint.clone(),
+            observed_after: Some(current.observed_state_fingerprint.clone()),
+        });
+    }
+    let mut spec = if remove.is_empty() {
+        CommandSpec::new(PACMAN_INSTALL[0], &PACMAN_INSTALL[1..])
+    } else {
+        CommandSpec::new(PACMAN_REMOVE[0], &PACMAN_REMOVE[1..])
+    };
+    spec.requires_privilege = true;
+    for id in install {
+        let Some(operation) = current
+            .operations
+            .iter()
+            .find(|operation| operation.package.name == id.name)
+        else {
+            // Already installed: --needed would skip it, so it is not requested.
+            continue;
+        };
+        let repository = pacman_field(operation, 3)
+            .filter(|repo| crate::identity::token_like(repo, b"_-"))
+            .ok_or_else(|| Error::Safety("cannot determine reviewed Pacman repository".into()))?;
+        spec.args.push(format!("{repository}/{}", id.name));
+    }
+    for id in remove {
+        spec.args.push(id.name.clone());
+    }
+    if spec.args.last().is_some_and(|arg| arg == "--") {
+        return Err(Error::Safety(
+            "reviewed Pacman plan has no requested target".into(),
+        ));
+    }
+    run_verified(
+        runner,
+        &backend,
+        &current,
+        &spec,
+        canceled,
+        journal,
+        guard,
+        &|operation| {
+            pacman_field(operation, 1)
+                .filter(|v| {
+                    v.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b".+-:_~".contains(&b))
+                })
+                .map(str::to_owned)
+        },
+    )
+}
+/// Executor-built Pacman transactions; sudo delegation accepts only these prefixes.
+pub const PACMAN_INSTALL: &[&str] = &[
+    "pacman",
+    "--sync",
+    "--needed",
+    "--noconfirm",
+    "--noprogressbar",
+    "--color",
+    "never",
+    "--",
+];
+pub const PACMAN_REMOVE: &[&str] = &[
+    "pacman",
+    "--remove",
+    "--noconfirm",
+    "--noprogressbar",
+    "--color",
+    "never",
+    "--",
+];
+fn pacman_field(operation: &crate::Operation, index: usize) -> Option<&str> {
+    operation
+        .native_detail
+        .split('\t')
+        .nth(index)
+        .filter(|field| !field.is_empty())
 }
 fn planned_version(detail: &str) -> Option<&str> {
     let version = detail

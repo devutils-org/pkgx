@@ -18,7 +18,7 @@ struct Cli {
     /// Print versioned JSON results (export and completions emit native text).
     #[arg(long, global = true)]
     json: bool,
-    /// Use sudo only for confirmed APT execution; previews stay unprivileged.
+    /// Use sudo only for confirmed APT/Pacman execution; previews stay unprivileged.
     #[arg(long, global = true)]
     sudo: bool,
     /// Dedicated private transaction directory; inspection never creates it.
@@ -84,7 +84,7 @@ enum Commands {
     Why { package: String },
     /// Inspect installed native dependency expressions without resolving a graph.
     Deps { package: String },
-    /// Preview or confirm an installation (execution supports APT only).
+    /// Preview or confirm an installation (execution supports APT and Pacman).
     Install {
         package: String,
         #[arg(long)]
@@ -92,7 +92,7 @@ enum Commands {
         #[arg(long, conflicts_with = "dry_run")]
         yes: bool,
     },
-    /// Preview or confirm a removal (execution supports APT only).
+    /// Preview or confirm a removal (execution supports APT and Pacman).
     Remove {
         package: String,
         #[arg(long)]
@@ -513,9 +513,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     preview.warnings.push(format!("Stored preview only: native state has not been revalidated; expires at Unix time {}.",saved.expires_unix_secs));
                     display(&preview, cli.json)?;
                 } else {
-                    if saved.provider != ProviderId::Apt {
+                    if !pkgx_core::execution::executable(saved.provider) {
                         return Err(pkgx_core::Error::Unsupported(
-                            "saved-plan execution currently supports APT only".into(),
+                            "saved-plan execution supports APT and Pacman only".into(),
                         )
                         .into());
                     }
@@ -589,7 +589,11 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 .flatten()
                 .collect::<Vec<_>>();
             let diff = state.diff(&observed)?;
-            if diff.missing.iter().any(|id| id.provider != ProviderId::Apt) {
+            if diff
+                .missing
+                .iter()
+                .any(|id| !pkgx_core::execution::executable(id.provider))
+            {
                 return Err(pkgx_core::Error::Unsupported("manifest requires a missing package from a provider without an executor; no changes performed".into()).into());
             }
             if diff.missing.is_empty() {
@@ -598,15 +602,21 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     cli.json,
                 )?;
             } else {
-                transact(
-                    &runner,
-                    &diff.missing,
-                    &[],
-                    dry_run,
-                    yes,
-                    cli.json,
-                    &journal,
-                )?;
+                // One reviewed, confirmed transaction per provider in deterministic
+                // order; the first failure stops before later providers run.
+                let mut providers: Vec<ProviderId> =
+                    diff.missing.iter().map(|id| id.provider).collect();
+                providers.sort();
+                providers.dedup();
+                for provider in providers {
+                    let missing: Vec<_> = diff
+                        .missing
+                        .iter()
+                        .filter(|id| id.provider == provider)
+                        .cloned()
+                        .collect();
+                    transact(&runner, &missing, &[], dry_run, yes, cli.json, &journal)?;
+                }
             }
         }
         Commands::Plan {
@@ -749,7 +759,9 @@ fn qualified_id(input: &str) -> Result<pkgx_core::PackageId, pkgx_core::Error> {
 
 fn require_linux() -> Result<(), pkgx_core::Error> {
     if std::env::consts::OS != "linux" {
-        return Err(pkgx_core::Error::Unavailable("APT requires Linux".into()));
+        return Err(pkgx_core::Error::Unavailable(
+            "native execution requires Linux".into(),
+        ));
     }
     Ok(())
 }
@@ -772,37 +784,29 @@ fn transact(
     json: bool,
     journal: &dyn Fn() -> Result<pkgx_core::journal::Journal, pkgx_core::Error>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if dry_run
-        && install
-            .iter()
-            .chain(remove)
-            .any(|id| id.provider != ProviderId::Apt)
-    {
-        let provider = install
-            .iter()
-            .chain(remove)
-            .next()
-            .expect("requested package")
-            .provider;
-        display(
-            &providers::backend(provider, runner, std::env::consts::OS)?.plan(install, remove)?,
-            json,
-        )?;
-        return Ok(());
-    }
+    let provider = install
+        .iter()
+        .chain(remove)
+        .next()
+        .expect("requested package")
+        .provider;
     if install
         .iter()
         .chain(remove)
-        .any(|id| id.provider != ProviderId::Apt)
+        .any(|id| id.provider != provider)
     {
-        return Err(pkgx_core::Error::Unsupported(
-            "execution currently supports APT only; no provider fallback is performed".into(),
+        return Err(pkgx_core::Error::Safety(
+            "one transaction cannot span several providers".into(),
         )
         .into());
     }
-    require_linux()?;
-    let plan =
-        providers::backend(ProviderId::Apt, runner, std::env::consts::OS)?.plan(install, remove)?;
+    if !dry_run && !pkgx_core::execution::executable(provider) {
+        return Err(pkgx_core::Error::Unsupported(format!(
+            "{provider} execution is not implemented (APT and Pacman only); no provider fallback is performed"
+        ))
+        .into());
+    }
+    let plan = providers::backend(provider, runner, std::env::consts::OS)?.plan(install, remove)?;
     if dry_run {
         display(&plan, json)?;
         return Ok(());
@@ -826,14 +830,24 @@ fn execute_reviewed(
         &pkgx_core::managed::ManagedState,
     )>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let provider = install
+        .iter()
+        .chain(remove)
+        .next()
+        .ok_or_else(|| pkgx_core::Error::InvalidInput("no package requested".into()))?
+        .provider;
     // Keep stdout a single result document in JSON mode; preview goes to stderr.
     eprintln!("{}", output::human(&plan)?);
-    confirm_action(runner, yes, "Apply this native APT transaction? Type yes: ")?;
+    confirm_action(
+        runner,
+        yes,
+        &format!("Apply this native {provider} transaction? Type yes: "),
+    )?;
     if let Some(saved) = saved {
         saved.validate_at(now_secs()?)?;
     }
     let use_sudo = pkgx_core::privilege::authorize_apt(
-        &pkgx_core::privilege::ProcessSudoAuthenticator,
+        &pkgx_core::privilege::ProcessSudoAuthenticator { provider },
         runner.sudo_requested,
         plan,
         true,
@@ -856,7 +870,7 @@ fn execute_reviewed(
             &guard,
         )?
     } else if let Some(saved) = saved {
-        pkgx_core::execution::apply_saved_apt(
+        pkgx_core::execution::apply_saved(
             execution_runner,
             saved,
             true,
@@ -864,7 +878,7 @@ fn execute_reviewed(
             Some(&journal),
         )?
     } else {
-        pkgx_core::execution::apply_apt_recorded(
+        pkgx_core::execution::apply_recorded(
             execution_runner,
             plan,
             install,

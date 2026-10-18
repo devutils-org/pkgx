@@ -51,6 +51,38 @@ fn token(value: &str, extra: &[u8]) -> bool {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || extra.contains(&b))
 }
+/// Native architecture (or Homebrew scope) names, used only to disambiguate a package that shares
+/// its provider's name from a redundant provider prefix in manifests.
+pub fn known_scope(provider: ProviderId, arch: &str) -> bool {
+    let known: &[&str] = match provider {
+        ProviderId::Apt => &[
+            "all", "amd64", "arm64", "armel", "armhf", "i386", "loong64", "mips64el", "ppc64el",
+            "riscv64", "s390x",
+        ],
+        ProviderId::Pacman => &[
+            "any",
+            "x86_64",
+            "x86_64_v3",
+            "x86_64_v4",
+            "aarch64",
+            "armv7h",
+            "i686",
+            "pentium4",
+            "riscv64",
+            "loong64",
+        ],
+        ProviderId::Dnf => &[
+            "noarch", "x86_64", "aarch64", "i686", "ppc64le", "s390x", "riscv64", "armv7hl",
+        ],
+        ProviderId::Brew => &["formula", "cask"],
+        _ => &[],
+    };
+    known.contains(&arch)
+}
+/// Bounded ASCII token: alphanumeric start, then alphanumerics or `extra`.
+pub fn token_like(value: &str, extra: &[u8]) -> bool {
+    value.len() <= 255 && token(value, extra)
+}
 pub fn parse_name(provider: ProviderId, input: &str) -> Result<PackageId, Error> {
     if provider == ProviderId::Apt {
         return apt::package_id(input);

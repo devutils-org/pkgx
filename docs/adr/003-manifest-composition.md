@@ -17,8 +17,9 @@ remains pending.
 
 Mixed-provider planning checks all requested providers and only asks adapters for
 capabilities they implement. Unsupported missing-package operations fail. Execution
-is currently APT only, with preflight of every manifest provider before a transaction
-is considered. No partially applied multi-provider transaction is represented as
+is currently APT and Pacman, with preflight of every manifest provider before a
+transaction is considered; each provider gets its own reviewed, confirmed transaction
+in stable provider order and the first failure stops later providers. No partially applied multi-provider transaction is represented as
 atomic. A fully satisfied mixed manifest is a read-only no-op.
 
 Script recipe declarations are not ownership receipts. Preparation verifies integrity
