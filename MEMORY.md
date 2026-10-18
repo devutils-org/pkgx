@@ -36,7 +36,7 @@ Dernier checkpoint : 184 tests Rust + 2 tests Python, Clippy sans avertissement.
 
 ## Travail restant
 
-- Faire tourner les workflows CI configurés (conteneurs, sandbox recettes, macOS) et valider Homebrew sur macOS.
+- CI verte (run 39143547380) et artefacts Linux/macOS vérifiés (run 39143553843) le 18/10/2026 ; roadmap M0–M8 cochée. Reste : pas de job Flatpak en CI, TUI sur terminal macOS.
 - Signature/notarisation et publication des distributions ; artefacts multi-plateformes.
 - Suspension terminal de la TUI pendant le prompt sudo : couverte seulement par tests unitaires.
 
@@ -44,4 +44,4 @@ Ne jamais exécuter de transaction native, de sudo ou de script téléchargé su
 
 ## Git
 
-Remote `origin` = `https://github.com/moha-bekh/pkgx.git`, branche `main`. Créer des commits locaux et laisser l’utilisateur pousser ; ne pas pousser sans nouvelle demande.
+Remote `origin` = `https://github.com/moha-bekh/pkgx.git`, branche `main`. Créer des commits locaux et laisser l’utilisateur pousser ; ne pas pousser sans nouvelle demande. Le SSH n’a pas d’agent dans les sessions Claude : pousser en HTTPS avec `git -c credential.helper='!gh auth git-credential' push https://github.com/moha-bekh/pkgx.git main` (le dépôt redirige vers devutils-org/pkgx).

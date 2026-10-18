@@ -2,6 +2,8 @@
 
 ## 0.1.0 — unreleased
 
+- Run the managed-file checks in CI on Linux (bubblewrap) and macOS; the full CI
+  matrix and the release-artifact workflow passed.
 - Add experimental `files` manifest declarations for home-relative configuration
   files (ADR 013): strict validation, layering, confined source loading and
   `diff` states.

@@ -1,8 +1,8 @@
 # pkgx
 
 Rust CLI for native package inventory, provenance, conservative plans and declarative
-TOML reconciliation of packages and home-relative configuration files. Native APT execution is experimental; platform CI is configured
-but has not run in this development environment.
+TOML reconciliation of packages and home-relative configuration files. Native execution is experimental; the platform CI matrix (Debian, Ubuntu,
+Arch, Fedora containers and macOS) passes, without any certification claim.
 
 ```sh
 cargo run -p pkgx-cli -- providers
@@ -119,7 +119,8 @@ read-only on the host; Pacman transactions and cleanup ran only in a disposable
 user-namespace Arch root, and recipe install/uninstall only in a loopback-only sandbox. Managed configuration
 files passed a bubblewrap sandbox with a private HOME.
 APT (Debian bookworm, Ubuntu 24.04) and DNF5 (Fedora 44) transactions ran in rootless
-disposable roots. Configured CI runs and macOS native validation remain pending. No host package
+disposable roots. The CI matrix passed (GitHub Actions run 39143547380), including real Homebrew
+transactions and managed files on a disposable macOS runner. No host package
 transaction, cleanup or installation script has run. See [validation status](docs/support.md) and [local results](docs/validation.md),
 [manifest reference](docs/manifest.md), [recipe preparation](docs/recipes.md),
 [failure/recovery](docs/recovery.md), [roadmap](pkgx.md) and [current scope](docs/continuation-plan.md).

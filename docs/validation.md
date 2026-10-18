@@ -123,8 +123,8 @@ Homebrew 7 receipts lack `installed_as_dependency` (reasons were `unknown`), and
 
 The same check now refuses to run unless PKGX_DISPOSABLE=1 and uses a preinstalled
 `brew` when present, so the `macos-smoke` CI job runs it on the discarded hosted
-runner. It was re-run in the Linux root after that change (passed); it has not run
-on macOS yet.
+runner. It was re-run in the Linux root after that change (passed) and then
+passed on the hosted macOS runner (GitHub Actions run 39143547380).
 
 ## Script recipe sandbox — 2026-10-18
 
@@ -173,13 +173,24 @@ small terminals, wrapped Unicode details and stable scrolling through 80 package
 The help overlay preserves reviewed plans and consumes action keys without arming
 execution. No real native transaction was driven through the terminal.
 
+## GitHub Actions — 2026-10-18
+
+GitHub Actions run 39143547380 on commit 7b6d4a7 passed every job: `check` (fmt, clippy, tests, packaging
+tests); `apt-containers` for debian:bookworm-slim and ubuntu:24.04 (inspection,
+transactions, strict mode, sudo and PAM checks); `native-inventory` for
+archlinux:base (Pacman inspection and transactions) and fedora:latest (RPM and DNF5
+transactions); `recipe-sandbox` (recipe and managed-file bubblewrap sandboxes); and
+`macos-smoke` (tests, providers, Homebrew inventory, Homebrew formula transactions and
+the managed-file checks on the discarded runner). The previous push (a0d2485) also
+passed without the managed-file steps. artifacts run 39143553843 built and checksum-verified Linux gnu,
+Linux musl and macOS arm64 archives; they were downloaded and re-verified locally.
+
 ## Pending evidence and unsupported work
 
-Docker/Podman and APT are unavailable locally. Configured Debian/Ubuntu transaction
-checks (including strict mode/idempotence), disposable Arch/Fedora consultation,
-macOS Homebrew smoke and multi-platform artifact jobs have not run here. Configuring
-these jobs is not evidence of passing them. No native package transaction,
-downloaded installation script or cleanup operation has run on the host.
+Docker/Podman and APT are unavailable locally; container evidence comes from CI.
+Flatpak has no CI job (rootless local root only). No native package transaction,
+downloaded installation script or cleanup operation has run on the host. No release
+is published, signed or notarized.
 
 Homebrew casks, cross-provider atomic execution and automatic cleanup beyond native
 cache commands and reviewed orphan removal remain unsupported. Sudo authentication

@@ -112,7 +112,7 @@ Planning and execution are separate: backends can propose native operations; the
 - [x] Define additive vs strict synchronization; default to **additive** (never remove undeclared packages). (Strict mode is APT-grant scoped, ADR 005; verified natively in Debian/Ubuntu roots.)
 - [x] Support platform/provider-specific sections and profile composition with deterministic precedence.
 - [x] Normalize observed state and show drift with reasons and provider attribution.
-- [x] Detect conflicts, stale plans, missing packages and unsupported operations before execution. (Fixture/simulated evidence; native CI pending.)
+- [x] Detect conflicts, stale plans, missing packages and unsupported operations before execution. (Fixture evidence plus native APT/Pacman/DNF CI transactions.)
 - [x] Ensure repeated apply is a no-op when desired state already matches. (Verified natively for APT, Pacman and DNF.)
 
 **Acceptance**: exported manifest can be parsed; apply is idempotent in integration tests; undeclared software is not removed by default; all destructive changes are previewed.
@@ -177,9 +177,9 @@ Planning and execution are separate: backends can propose native operations; the
 **Tasks**
 
 - [x] Add regression suites for package locks, partial transactions, interruptions, stale plans, and provider failures.
-- [ ] Validate on a documented support matrix; run macOS smoke tests.
+- [x] Validate on a documented support matrix; run macOS smoke tests. (GitHub Actions run 39143547380 on 7b6d4a7: Debian bookworm/Ubuntu 24.04 APT, Arch Pacman and Fedora DNF5 transactions in disposable containers, bubblewrap recipe and managed-file sandboxes, macOS Homebrew transactions and managed files; see docs/support.md. Not a certification.)
 - [x] Write installation, security, manifest, backend capability, and recovery documentation.
-- [ ] Provide shell completions, release binaries, changelog, reproducible build instructions where feasible. (Local versioned archives/checksums and deterministic packaging implemented; multi-platform release execution pending.)
+- [x] Provide shell completions, release binaries, changelog, reproducible build instructions where feasible. (artifacts run 39143553843: Linux gnu/musl and macOS arm64 archives with verified SHA-256 checksums, uploaded as reviewable workflow artifacts. No GitHub release is published; signing/notarization remain open.)
 - [x] Perform security review of script execution, privilege boundaries, and cleanup operations. (Internal review recorded in docs/security-review.md; no independent audit.)
 
 **Acceptance**: documented support matrix passes CI; all mutating operations are plan-driven; known limitations are published; release artifacts are verified.
@@ -315,7 +315,8 @@ For each milestone:
 
 ## Implementation progress
 
-M0–M2 remain in progress; their native acceptance evidence is not yet available.
+M0–M8 tasks are complete; native acceptance evidence comes from disposable roots and CI
+(docs/support.md), not from a certification.
 Implemented and fixture-tested: core identities/models/capabilities, subprocess
 bounds/cancellation, provider diagnostics, APT inspection/planning/experimental
 execution, explicit manual-mark actions, bounded saved-plan review/expiration,
@@ -335,14 +336,17 @@ a Ratatui browser with details/provenance/orphans/plans, read-only by default,
 with opt-in typed confirmation for any executable provider and cancellable worker
 execution. M7 has expanded
 regressions, recovery/security documentation, completion definitions and a manual
-artifact-building workflow; no release has been published or certified.
+artifact-building workflow whose Linux/macOS archives were built and checksum-verified
+in CI; no release has been published or certified. M8 manages home-relative
+configuration files (ADR 013).
 
 Local checks use fixtures, injected runners, temporary files and TestBackend.
 Native transactions, recipe scripts and cleanup ran only inside disposable rootless
 roots (tests/sandbox/); no host package transaction, downloaded script or cleanup
-operation has run on the workstation. Configured CI jobs (containers, recipe
-sandbox, macOS smoke) have not run and are not counted as passed. macOS, release
-signing and published artifacts remain pending. See docs/support.md for limits.
+operation has run on the workstation. The configured CI jobs (containers, recipe and
+managed-file sandboxes, macOS Homebrew and managed files) passed in GitHub Actions run 39143547380.
+Release signing, notarization and a published release remain open; Flatpak has no
+CI job. See docs/support.md for limits.
 
 Latest local checkpoint (2026-10-18): 169 Rust tests and 2 packaging tests passed;
 native scenarios passed in rootless disposable roots for Debian bookworm, Ubuntu

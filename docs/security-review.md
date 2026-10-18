@@ -65,10 +65,10 @@ its native PAM/policy/terminal acceptance remains pending. APT's own lock
 covers its transaction, not the earlier simulation; races can be detected afterward,
 not prevented atomically. Native command cancellation can leave partial changes.
 
-The configured Debian/Ubuntu/Arch/Fedora/macOS jobs have not run locally. TUI widget,
+The Debian/Ubuntu/Arch/Fedora/macOS CI jobs passed (GitHub Actions run 39143547380). TUI widget,
 confirmation and worker-cancellation logic is tested. Linux pseudo-terminal demo
-smoke tests and native read-only Pacman checks passed; macOS terminal and real native
-transaction validation remain pending. Cross-provider strict execution, system-scope
+smoke tests and native read-only Pacman checks passed; macOS terminal validation of
+the TUI remains pending. Cross-provider strict execution, system-scope
 recipes and observation of undeclared script effects stay unsupported.
 
 ## Internal review of new boundaries — 2026-10-18
