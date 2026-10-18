@@ -120,6 +120,11 @@ the journal recorded the results. Two defects were found and fixed on the way:
 Homebrew 7 receipts lack `installed_as_dependency` (reasons were `unknown`), and
 `brew uninstall` autoremoves dependencies unless HOMEBREW_NO_AUTOREMOVE is set.
 
+The same check now refuses to run unless PKGX_DISPOSABLE=1 and uses a preinstalled
+`brew` when present, so the `macos-smoke` CI job runs it on the discarded hosted
+runner. It was re-run in the Linux root after that change (passed); it has not run
+on macOS yet.
+
 ## Script recipe sandbox — 2026-10-18
 
 `tests/sandbox/recipe-userns.sh target/debug/pkgx` runs `tests/sandbox/recipe-checks.sh`
@@ -156,9 +161,10 @@ macOS Homebrew smoke and multi-platform artifact jobs have not run here. Configu
 these jobs is not evidence of passing them. No native package transaction,
 downloaded installation script or cleanup operation has run on the host.
 
-Executors other than APT and Pacman, script installation/uninstall/receipts, cross-provider strict
-execution and automatic cleanup remain unsupported. Explicit sudo delegation is
-implemented; its native authentication/terminal validation remains pending. The
+Homebrew casks, cross-provider atomic execution and automatic cleanup beyond native
+cache commands and reviewed orphan removal remain unsupported. Sudo authentication
+passed through a pseudo-terminal in a disposable Debian root; TUI terminal
+suspension during the sudo prompt is covered only by unit tests. The
 source/security review in security-review.md is not an independent audit. No
 native-platform certification or v1.0 release is claimed.
 

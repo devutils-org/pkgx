@@ -80,3 +80,11 @@ jobs:
       - run: cargo test --workspace --locked
       - run: cargo run --locked -p pkgx-cli -- providers --json
       - run: cargo run --locked -p pkgx-cli -- list --provider brew --json
+      # The hosted runner is discarded after the job: real Homebrew transactions.
+      - name: Validate native Homebrew transactions on the disposable runner
+        env:
+          PKGX_DISPOSABLE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          cargo build --locked -p pkgx-cli
+          PATH="$PWD/target/debug:$PATH" sh tests/containers/brew-transactions.sh

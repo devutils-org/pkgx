@@ -60,7 +60,7 @@ for check in $CHECKS; do
     echo "== $check"
     chroot "$ROOT" /usr/bin/setpriv --reuid=1000 --regid=1000 --init-groups \
         /usr/bin/env -i PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin \
-        HOME=/home/brewer LC_ALL=C.UTF-8 sh "/checks/$check"
+        HOME=/home/brewer LC_ALL=C.UTF-8 PKGX_DISPOSABLE=1 sh "/checks/$check"
 done
 INNER
 echo 'per-run state (/tmp, /home) removed with the namespace'
