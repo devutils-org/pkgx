@@ -3,8 +3,10 @@
 Status: implemented experimentally in the CLI. Schema, layering, confined sources,
 `diff` states, `plan -f`/`apply -f` writes and `pkgx file adopt|list|forget|remove`
 have unit and CLI regressions and passed a bubblewrap sandbox with a private HOME
-(tests/sandbox/files-userns.sh, docs/validation.md). The core/TUI package planners
-still refuse manifests declaring files; macOS is unvalidated. Roadmap milestone M8.
+(tests/sandbox/files-userns.sh, docs/validation.md). `pkgx file list` reports each
+receipt as intact, drifted, missing or unsupported. The TUI manifest review shows file
+states read-only and never writes files; the core package planners refuse manifests
+declaring files. macOS is unvalidated. Roadmap milestone M8.
 
 Users want their configuration (e.g. `~/.tmux.conf`) declared next to the packages
 that read it. pkgx manages such files as opaque owned content: it copies declared

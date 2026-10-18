@@ -12,7 +12,7 @@ Continuer en autonomie l’implémentation de `pkgx.md`, avec une interface TUI 
 - Exécuteurs revus pour APT, Pacman (ADR 007), DNF5 (ADR 010), Flatpak (ADR 011) et Homebrew formules (ADR 012) : préversion, confirmation, revalidation, journal, vérification post-transaction, `--sudo` limité à des modèles exacts (pas pour Flatpak/Homebrew). Aucun rollback garanti.
 - Manifestes TOML additifs/stricts (strict limité aux autorisations APT, ADR 005), application par fournisseur dans un ordre stable.
 - Recettes : installation/désinstallation suivies avec reçus, ressources `~/` uniquement, confiance explicite, jamais root, pkgx ne supprime jamais de chemin (ADR 008) ; `--observe` expérimental.
-- Fichiers de config gérés (ADR 013, M8) : table `files` du manifeste, `diff`/`plan -f`/`apply -f`, `pkgx file adopt|list|forget|remove` avec sauvegardes privées ; copie d'octets uniquement, `~/` seulement ; sandbox `files-userns.sh` réussi. Reste : TUI/audit.
+- Fichiers de config gérés (ADR 013, M8) : table `files` du manifeste, `diff`/`plan -f`/`apply -f`, `pkgx file adopt|list|forget|remove` avec sauvegardes privées ; copie d'octets uniquement, `~/` seulement ; sandbox `files-userns.sh` réussi ; `file list` donne l'état des reçus, TUI en lecture seule. M8 terminé hors macOS ; idées suivantes : écritures depuis le TUI, templates/secrets (nouvelle ADR).
 - Nettoyage : classes safe/suggested/manual, `clean --cache` (apt-get clean / pacman -Sc) et `clean --orphans` via l’exécuteur revu (ADR 009).
 - TUI, démo, complétions, packaging déterministe ; archives locales x86_64 gnu/musl dans `dist/` (non publiées).
 
@@ -32,7 +32,7 @@ CARGO_TARGET_DIR=/tmp/pkgx-target cargo build --release --locked --offline --tar
 python3 scripts/test_package.py
 ```
 
-Dernier checkpoint : 183 tests Rust + 2 tests Python, Clippy sans avertissement.
+Dernier checkpoint : 184 tests Rust + 2 tests Python, Clippy sans avertissement.
 
 ## Travail restant
 

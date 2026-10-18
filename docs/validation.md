@@ -13,7 +13,7 @@ CARGO_TARGET_DIR=/tmp/pkgx-target cargo build --release --locked --offline -p pk
 python3 scripts/test_package.py
 ```
 
-183 Rust tests passed, plus 2 Python packaging tests. One standalone ignored Rust
+184 Rust tests passed, plus 2 Python packaging tests. One standalone ignored Rust
 test is a subprocess fixture explicitly invoked by the inherited-pipe regression;
 it does not represent missing product coverage.
 
@@ -154,6 +154,10 @@ and symlinked source were refused without touching the outside files; a held loc
 refused writes; `file remove` refused a drifted file and deleted an unchanged one
 with its receipt; `file forget` kept the file. Interrupted writes and running as root
 were exercised only by unit-level reasoning, not in the sandbox.
+
+A Linux pseudo-terminal smoke of `tui --provider pacman -f` (read-only host Pacman
+inventory, temporary HOME) showed `unmanaged_conflict ~/.bashrc` and `missing
+~/.tmux.conf` in the manifest review (m) and wrote no file or state.
 
 ## Native and terminal evidence
 

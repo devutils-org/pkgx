@@ -669,7 +669,7 @@ impl Drop for Restore {
 pub fn run(
     backends: &[Box<dyn Backend + '_>],
     runner: &super::session::Session,
-    manifest: Option<&DesiredState>,
+    manifest: Option<(&DesiredState, &std::path::Path)>,
     allow_apply: bool,
     state_dir: Option<std::path::PathBuf>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -811,7 +811,12 @@ pub fn run(
             KeyCode::Char('m') => {
                 browser.clear_review();
                 let result = (|| {
-                    let desired = manifest.ok_or("provide tui --file to inspect a manifest")?;
+                    let (full, path) =
+                        manifest.ok_or("provide tui --file to inspect a manifest")?;
+                    // Files are shown read-only; only `pkgx apply -f` writes them.
+                    let mut packages_only = full.clone();
+                    packages_only.files.clear();
+                    let desired = &packages_only;
                     let references: Vec<&dyn Backend> =
                         backends.iter().map(|b| b.as_ref()).collect();
                     let managed = if desired.system.mode == pkgx_core::manifest::SyncMode::Strict {
@@ -855,7 +860,14 @@ pub fn run(
                             remove: review.diff.removals.clone(),
                         });
                     }
-                    super::output::human(&review).map_err(Into::into)
+                    let mut text = super::output::human(&review)?;
+                    if !full.files.is_empty() {
+                        text.push_str("\nFiles (read-only here; write them with pkgx apply -f):\n");
+                        for file in super::observe_files(path, full, state_dir.clone())? {
+                            text.push_str(&format!("{}\t{}\n", file.state.as_str(), file.target));
+                        }
+                    }
+                    Ok(text)
                 })();
                 browser.set_page(result);
             }

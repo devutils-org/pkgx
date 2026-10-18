@@ -214,7 +214,7 @@ source = "dotfiles/nvim/init.lua"
 - [x] Write atomically as the user (staging + rename), never follow a destination symlink, create parent directories with private permissions, refuse setuid/setgid modes; record a receipt (target, source digest, written digest, mode). (Temporary-HOME regressions; no sandbox run yet.)
 - [x] Overwrite only files whose current digest matches their receipt; `drifted` and `unmanaged_conflict` targets are refused unless explicitly adopted (`pkgx adopt-file`-style grant, previewed, the previous content kept as a private backup). (`pkgx file adopt|list|forget`.)
 - [x] Removing a declaration only forgets ownership; deleting a managed file requires an explicit, previewed prune limited to files still matching their receipt. Never delete unmanaged or drifted files. (`pkgx file remove`, backed up first.)
-- [ ] Show managed files, drift and receipts in `audit`/TUI manifest review; `export` does not capture file contents.
+- [x] Show managed files, drift and receipts in `audit`/TUI manifest review; `export` does not capture file contents. (`pkgx file list` reports intact/drifted/missing/unsupported receipts; TUI manifest review shows file states read-only; provider `audit` is unchanged.)
 - [x] Validate in a sandbox with a private HOME (loopback-only), including drift, conflicts, interrupted writes and repeated apply as a no-op. (tests/sandbox/files-userns.sh; interrupted writes not exercised.)
 
 **Out of scope for M8**: system paths (`/etc`), services and reload actions (e.g. `tmux source-file` is suggested, never run), templating/per-host variables, secret management (contents are copied verbatim; storing secrets in manifests is discouraged), merging partial edits into foreign files.

@@ -96,8 +96,9 @@ pkgx file remove ~/.tmux.conf --dry-run
 Removing a declaration keeps the file and its receipt (reported as undeclared).
 Only `pkgx file remove` deletes a file, and only a managed file still identical to its
 receipt, after preview, confirmation and a private backup; drifted or unmanaged
-files are never deleted. `export` never includes files. The TUI manifest
-review covers packages only and refuses manifests declaring files.
+files are never deleted. `export` never includes files. `pkgx file list`
+reports each receipt as intact, drifted, missing or unsupported without a manifest.
+The TUI manifest review (m) shows file states read-only; only `apply -f` writes.
 
 Unknown schema versions are rejected. Future incompatible changes require a new
 version and explicit migration preserving the original; no migration is implicit.

@@ -434,10 +434,15 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 .into());
             }
             let manifest = file
-                .map(|file| load_manifest(file, &cli.profile))
+                .map(|file| {
+                    Ok::<_, Box<dyn std::error::Error>>((
+                        load_manifest(file.clone(), &cli.profile)?,
+                        file,
+                    ))
+                })
                 .transpose()?;
             let mut selected: Vec<ProviderId> = provider.into_iter().map(Into::into).collect();
-            if let Some(manifest) = &manifest {
+            if let Some((manifest, _)) = &manifest {
                 selected.extend(manifest.providers()?);
             }
             selected.sort();
@@ -449,7 +454,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             tui::run(
                 &backends,
                 &runner,
-                manifest.as_ref(),
+                manifest
+                    .as_ref()
+                    .map(|(state, path)| (state, path.as_path())),
                 allow_apply,
                 cli.state_dir.clone(),
             )?;
@@ -535,7 +542,10 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::File { command } => {
             let registry = file_registry(cli.state_dir.clone())?;
             match command {
-                FileCommand::List => display(&registry.read()?, cli.json)?,
+                FileCommand::List => display(
+                    &pkgx_core::files::audit_receipts(&home_directory()?, &registry.read()?)?,
+                    cli.json,
+                )?,
                 FileCommand::Adopt {
                     target,
                     dry_run,

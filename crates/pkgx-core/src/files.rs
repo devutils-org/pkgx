@@ -1058,3 +1058,52 @@ pub fn remove(
         .map_err(io)?;
     guard.forget(&preview.target)
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiptState {
+    /// Content and mode still equal what pkgx wrote or adopted.
+    Intact,
+    Drifted,
+    Missing,
+    Unsupported,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ReceiptStatus {
+    #[serde(flatten)]
+    pub receipt: FileReceipt,
+    pub state: ReceiptState,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ReceiptAudit {
+    pub schema_version: u32,
+    pub files: Vec<ReceiptStatus>,
+}
+/// Compare every receipt with its target, without a manifest and without mutation.
+pub fn audit_receipts(home: &Path, registry: &FileRegistryState) -> Result<ReceiptAudit, Error> {
+    registry.validate()?;
+    let files = registry
+        .files
+        .iter()
+        .map(|receipt| {
+            let state = match inspect(home, &receipt.target)? {
+                Inspection::Regular { sha256, mode, .. }
+                    if sha256 == receipt.sha256 && mode == receipt_mode_bits(&receipt.mode)? =>
+                {
+                    ReceiptState::Intact
+                }
+                Inspection::Regular { .. } => ReceiptState::Drifted,
+                Inspection::Absent => ReceiptState::Missing,
+                Inspection::Unsupported(_) => ReceiptState::Unsupported,
+            };
+            Ok(ReceiptStatus {
+                receipt: receipt.clone(),
+                state,
+            })
+        })
+        .collect::<Result<_, Error>>()?;
+    Ok(ReceiptAudit {
+        schema_version: registry.schema_version,
+        files,
+    })
+}

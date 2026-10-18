@@ -486,3 +486,28 @@ fn removal_deletes_only_unchanged_managed_files_after_backup() {
         Err(Error::Safety(_))
     ));
 }
+
+#[test]
+fn receipt_audit_reports_current_state_without_a_manifest() {
+    let f = Fixture::new();
+    let h = f.home.path();
+    write(&h.join("intact"), b"a", 0o600);
+    write(&h.join("drifted"), b"edited", 0o600);
+    std::os::unix::fs::symlink("/etc/hostname", h.join("link")).unwrap();
+    let registry = FileRegistryState {
+        schema_version: 1,
+        files: vec![
+            receipt("~/drifted", b"b", "0600"),
+            receipt("~/gone", b"c", "0600"),
+            receipt("~/intact", b"a", "0600"),
+            receipt("~/link", b"d", "0600"),
+        ],
+    };
+    let audit = files::audit_receipts(h, &registry).unwrap();
+    let states: Vec<_> = audit.files.iter().map(|s| s.state).collect();
+    use files::ReceiptState::*;
+    assert_eq!(states, vec![Drifted, Missing, Intact, Unsupported]);
+    let json = serde_json::to_value(&audit).unwrap();
+    assert_eq!(json["files"][2]["target"], "~/intact");
+    assert_eq!(json["files"][2]["state"], "intact");
+}

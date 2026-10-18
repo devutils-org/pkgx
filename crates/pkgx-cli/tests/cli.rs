@@ -490,6 +490,7 @@ fn declared_files_reconcile_through_review_and_adoption() {
     let list = pkgx(&["file", "list", "--json"]);
     let value: serde_json::Value = serde_json::from_slice(&list.stdout).unwrap();
     assert_eq!(value["data"]["files"].as_array().unwrap().len(), 1);
+    assert_eq!(value["data"]["files"][0]["state"], "intact");
 
     assert_eq!(
         pkgx(&["file", "remove", "~/.tmux.conf", "--yes"])

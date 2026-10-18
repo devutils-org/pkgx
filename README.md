@@ -83,7 +83,9 @@ records private receipts. pkgx copies bytes only: no templates, merging, system 
 or reload actions. Existing files are never overwritten until `pkgx file adopt`
 backs them up and records them; local edits to managed files are reported as drift
 and refused. Only `pkgx file remove` deletes a file, and only an unchanged managed
-one after preview and backup (`file forget` drops a receipt only). See the [manifest reference](docs/manifest.md#configuration-files-experimental).
+one after preview and backup (`file forget` drops a receipt only). `file list` reports
+whether each managed file is intact, drifted, missing or unsupported; the TUI
+manifest review shows file states read-only. See the [manifest reference](docs/manifest.md#configuration-files-experimental).
 
 Recipe check/verify validate pinned integrity metadata and optionally verify a bounded
 HTTPS download in private temporary storage without executing it. `recipe install`
