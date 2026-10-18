@@ -32,7 +32,10 @@ class ArchiveTests(unittest.TestCase):
                 manifest = json.load(archive.extractfile(next(f for f in files if f.name.endswith("/BUILD.json"))))
                 self.assertEqual(manifest["binary_sha256"], hashlib.sha256(binary.read_bytes()).hexdigest())
                 self.assertFalse(manifest["native_certification"])
-                self.assertTrue(any(f.name.endswith("/LICENSE") for f in files))
+                for name in ["LICENSE", "LICENSE-MIT", "LICENSE-APACHE", "REFERENCE.md"]:
+                    member = next(f for f in files if f.name.endswith("/" + name))
+                    self.assertEqual(archive.extractfile(member).read(),
+                                     (packaging.ROOT / name).read_bytes())
 
     def test_refuses_overwrite_symlinks_and_path_traversal(self):
         with tempfile.TemporaryDirectory() as tmp:

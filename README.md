@@ -63,4 +63,4 @@ Use disposable environments for native transactions; see [validation](docs/valid
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.

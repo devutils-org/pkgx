@@ -193,3 +193,7 @@ requires a preauthorized sudo session or a passwordless policy; pkgx never reads
 password from stdin. Native revalidation follows authentication, and the eventual
 transaction uses sudo -n. No-op/dry-run operations never authenticate. See the
 [privilege policy](docs/adr/006-explicit-sudo.md) for fixed-path/configuration limits.
+
+## License
+
+[MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.

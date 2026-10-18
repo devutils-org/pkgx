@@ -40,7 +40,8 @@ python3 scripts/package.py --binary target/release/pkgx \
 
 For cross-compilation, pass the explicit target and matching target-directory
 binary. The target label is supplied by the builder, not independently attested.
-The archive contains the binary, BUILD.json, license, documentation, example
+The archive contains the binary, BUILD.json, both MIT and Apache-2.0 licenses,
+documentation, example
 manifest files and shell completions. BUILD.json records the binary and Cargo.lock SHA-256, target, version,
 compiler information when supplied, and the explicit absence of certification.
 Archive and checksum destinations are never overwritten.

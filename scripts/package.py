@@ -66,7 +66,8 @@ def package(binary, target, output_dir, epoch, rustc_info=None):
         "pkgx": (binary_bytes, 0o755),
         "BUILD.json": ((json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode(), 0o644),
     }
-    names = ["README.md", "CHANGELOG.md", "LICENSE", "pkgx.md",
+    names = ["README.md", "REFERENCE.md", "CHANGELOG.md", "LICENSE",
+             "LICENSE-MIT", "LICENSE-APACHE", "pkgx.md",
              "completions/pkgx.bash", "completions/_pkgx", "completions/pkgx.fish"]
     names += [str(path.relative_to(ROOT)) for path in sorted((ROOT / "docs").rglob("*.md"))]
     names += [str(path.relative_to(ROOT)) for path in sorted((ROOT / "examples").glob("*.toml"))]
