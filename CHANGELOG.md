@@ -8,6 +8,8 @@
 - Apply mixed manifests as one reviewed transaction per executable provider.
 - Fix export/diff of packages named like their provider (`pacman`, `apt`).
 - Add a disposable user-namespace Arch root for native Pacman validation.
+- Add tracked script install/uninstall with trust confirmation, home-relative
+  ownership checks, private receipts and recorded uninstall actions (ADR 008).
 
 - Initialize Rust workspace, package identity and plan models.
 - Add controlled subprocess runner and provider binary diagnostics.

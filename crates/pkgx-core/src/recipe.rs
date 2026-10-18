@@ -1,4 +1,5 @@
-//! Recipe preparation only. No downloaded script is ever executed by this module.
+//! Recipe validation and verified download. Execution lives in `script`, behind
+//! explicit trust confirmation and receipts; this module never runs an artifact.
 use crate::{
     command::{CommandRunner, CommandSpec},
     providers::output,
@@ -38,7 +39,7 @@ pub struct Resource {
     pub kind: ResourceKind,
     pub path: String,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourceKind {
     File,
@@ -135,7 +136,14 @@ impl Recipe {
         }
         let mut paths = BTreeSet::new();
         for resource in &self.resources {
-            let path = Path::new(&resource.path);
+            // `~/` paths are resolved against the installing user's home.
+            let path = Path::new(
+                resource
+                    .path
+                    .strip_prefix("~")
+                    .filter(|rest| rest.starts_with('/') && rest.len() > 1)
+                    .unwrap_or(&resource.path),
+            );
             if !path.is_absolute()
                 || path.parent().is_none()
                 || path
@@ -145,7 +153,7 @@ impl Recipe {
                 || !paths.insert(resource.path.clone())
             {
                 return Err(Error::InvalidInput(
-                    "resources require unique absolute non-root paths without parent traversal"
+                    "resources require unique absolute or ~/ non-root paths without parent traversal"
                         .into(),
                 ));
             }
@@ -172,8 +180,10 @@ impl Recipe {
                     confidence: crate::Confidence::DeclaredOnly,
                 })
                 .collect(),
-            execution_supported: false,
-            ownership: "declared_only_unverified; not permission to remove files".into(),
+            execution_supported: self.uninstall.is_some()
+                && !self.resources.is_empty()
+                && self.resources.iter().all(|r| r.path.starts_with("~/")),
+            ownership: "declared_only_unverified until a receipt records created resources; not permission to remove files".into(),
         })
     }
     /// Download to private temporary storage, verify using the native SHA-256
@@ -183,6 +193,19 @@ impl Recipe {
         runner: &dyn CommandRunner,
         os: &str,
     ) -> Result<VerifiedDownload, Error> {
+        let bytes = self.download_verified(runner, os)?;
+        Ok(VerifiedDownload {
+            recipe: self.summary()?,
+            byte_count: bytes.len() as u64,
+            verified: true,
+        })
+    }
+    /// Return verified artifact bytes; the temporary copy is discarded on return.
+    pub fn download_verified(
+        &self,
+        runner: &dyn CommandRunner,
+        os: &str,
+    ) -> Result<Vec<u8>, Error> {
         self.validate()?;
         if !matches!(os, "linux" | "macos") {
             return Err(Error::Unsupported("recipe verification OS".into()));
@@ -250,11 +273,7 @@ impl Recipe {
                 "download SHA-256 mismatch; artifact discarded".into(),
             ));
         }
-        Ok(VerifiedDownload {
-            recipe: self.summary()?,
-            byte_count: metadata.len(),
-            verified: true,
-        })
+        Ok(bytes)
     }
 }
 fn io(source: std::io::Error) -> Error {

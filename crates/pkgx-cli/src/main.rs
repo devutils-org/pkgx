@@ -170,7 +170,7 @@ enum Commands {
         #[arg(long, value_enum, default_value = "apt")]
         provider: Vec<InventoryProvider>,
     },
-    /// Validate or verify script artifacts without executing them.
+    /// Check, verify, install and track script recipes (explicit trust required).
     Recipe {
         #[command(subcommand)]
         command: RecipeCommand,
@@ -215,6 +215,31 @@ enum RecipeCommand {
     Verify {
         #[arg(short = 'f', long)]
         file: PathBuf,
+    },
+    /// Run a verified recipe as your user after trust confirmation; record a receipt.
+    Install {
+        #[arg(short = 'f', long)]
+        file: PathBuf,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long, conflicts_with = "dry_run")]
+        yes: bool,
+    },
+    /// Run a tracked recipe's own uninstall action after ownership checks.
+    Uninstall {
+        name: String,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long, conflicts_with = "dry_run")]
+        yes: bool,
+    },
+    /// List tracked script receipts; everything else is unmanaged.
+    List,
+    /// Drop a receipt without running scripts or touching any file.
+    Forget {
+        name: String,
+        #[arg(long)]
+        yes: bool,
     },
 }
 
@@ -397,23 +422,81 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             display(&reports, cli.json)?;
         }
         Commands::Recipe { command } => {
-            use std::io::Read;
-            let (file, verify) = match command {
-                RecipeCommand::Check { file } => (file, false),
-                RecipeCommand::Verify { file } => (file, true),
+            let store = || -> Result<_, pkgx_core::Error> {
+                Ok(pkgx_core::script::ReceiptStore::new(
+                    state_directory(cli.state_dir.clone())?.join("scripts"),
+                ))
             };
-            let mut input = String::new();
-            std::fs::File::open(file)?
-                .take(1024 * 1024 + 1)
-                .read_to_string(&mut input)?;
-            let recipe = pkgx_core::recipe::Recipe::parse(&input)?;
-            if verify {
-                display(
-                    &recipe.verify_download(&runner, std::env::consts::OS)?,
+            match command {
+                RecipeCommand::Check { file } => display(&load_recipe(file)?.summary()?, cli.json)?,
+                RecipeCommand::Verify { file } => display(
+                    &load_recipe(file)?.verify_download(&runner, std::env::consts::OS)?,
                     cli.json,
-                )?;
-            } else {
-                display(&recipe.summary()?, cli.json)?;
+                )?,
+                RecipeCommand::Install { file, dry_run, yes } => {
+                    let recipe = load_recipe(file)?;
+                    let store = store()?;
+                    let home = home_directory()?;
+                    let preview = pkgx_core::script::preview_install(&recipe, &store, &home)?;
+                    if dry_run {
+                        display(&preview, cli.json)?;
+                        return Ok(());
+                    }
+                    eprintln!("{}", output::human(&preview)?);
+                    confirm_action(
+                        &runner,
+                        yes,
+                        "Trust and run this verified script as your user? Type yes: ",
+                    )?;
+                    finish_script(
+                        pkgx_core::script::install(
+                            &runner,
+                            &recipe,
+                            &store,
+                            &home,
+                            std::env::consts::OS,
+                            true,
+                            &runner.canceled,
+                        )?,
+                        cli.json,
+                    )?;
+                }
+                RecipeCommand::Uninstall { name, dry_run, yes } => {
+                    let store = store()?;
+                    let receipt = pkgx_core::script::preview_uninstall(&store, &name)?;
+                    if dry_run {
+                        display(&receipt, cli.json)?;
+                        return Ok(());
+                    }
+                    eprintln!("{}", output::human(&receipt)?);
+                    confirm_action(
+                        &runner,
+                        yes,
+                        "Run this recipe's recorded uninstall action? Type yes: ",
+                    )?;
+                    finish_script(
+                        pkgx_core::script::uninstall(
+                            &runner,
+                            &store,
+                            &name,
+                            true,
+                            &runner.canceled,
+                        )?,
+                        cli.json,
+                    )?;
+                }
+                RecipeCommand::List => display(&store()?.list()?, cli.json)?,
+                RecipeCommand::Forget { name, yes } => {
+                    let store = store()?;
+                    eprintln!("{}", output::human(&store.read(&name)?)?);
+                    confirm_action(
+                        &runner,
+                        yes,
+                        "Forget this receipt? Files are not touched. Type yes: ",
+                    )?;
+                    store.forget(&name)?;
+                    display(&serde_json::json!({"forgotten": name}), cli.json)?;
+                }
             }
         }
         Commands::Completions { shell } => {
@@ -753,6 +836,34 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn load_recipe(file: PathBuf) -> Result<pkgx_core::recipe::Recipe, Box<dyn std::error::Error>> {
+    use std::io::Read;
+    let mut input = String::new();
+    std::fs::File::open(file)?
+        .take(1024 * 1024 + 1)
+        .read_to_string(&mut input)?;
+    Ok(pkgx_core::recipe::Recipe::parse(&input)?)
+}
+fn home_directory() -> Result<PathBuf, pkgx_core::Error> {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .filter(|home| home.is_absolute())
+        .ok_or_else(|| pkgx_core::Error::InvalidInput("recipes require an absolute HOME".into()))
+}
+fn finish_script(
+    record: pkgx_core::script::ScriptRecord,
+    json: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let success = record.success;
+    display(&record, json)?;
+    if !success {
+        return Err(pkgx_core::Error::Safety(
+            "script action failed or could not be verified; inspect `recipe list`".into(),
+        )
+        .into());
+    }
+    Ok(())
+}
 fn qualified_id(input: &str) -> Result<pkgx_core::PackageId, pkgx_core::Error> {
     input.parse()
 }

@@ -62,6 +62,16 @@ jobs:
             -v "$PWD/target/x86_64-unknown-linux-musl/release/pkgx:/usr/local/bin/pkgx:ro" \
             -v "$PWD/tests/containers:/checks:ro" \
             "$CONTAINER_IMAGE" sh -c "$CONTAINER_CHECK"
+  recipe-sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      # Ubuntu restricts unprivileged user namespaces through AppArmor by default.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: cargo build --locked -p pkgx-cli
+      - run: sh tests/sandbox/recipe-userns.sh target/debug/pkgx
   macos-smoke:
     runs-on: macos-latest
     steps:

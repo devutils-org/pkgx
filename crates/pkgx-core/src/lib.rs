@@ -15,6 +15,7 @@ pub mod privilege;
 pub mod providers;
 pub mod recipe;
 pub mod saved_plan;
+pub mod script;
 pub mod version;
 
 use serde::{Deserialize, Serialize};

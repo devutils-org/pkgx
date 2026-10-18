@@ -1,6 +1,6 @@
 complete -c pkgx -f
 complete -c pkgx -n '__fish_use_subcommand' -a 'demo manage managed providers doctor list search info why deps install remove export diff plan apply audit clean history recipe tui completions help'
-complete -c pkgx -n '__fish_seen_subcommand_from recipe' -a 'check verify'
+complete -c pkgx -n '__fish_seen_subcommand_from recipe' -a 'check verify install uninstall list forget'
 complete -c pkgx -l provider -x -a 'apt pacman dnf flatpak brew'
 complete -c pkgx -l json
 complete -c pkgx -s f -l file -r -F

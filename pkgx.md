@@ -135,13 +135,13 @@ Planning and execution are separate: backends can propose native operations; the
 
 **Tasks**
 
-- [ ] Introduce `script` provider with explicit installation recipes (source URL, pinned version, SHA-256, interpreter, install/uninstall steps, declared resources).
-- [ ] Download scripts to temporary storage, verify checksum, require trust confirmation before execution.
-- [ ] Store installation receipts and transaction metadata in a local registry.
-- [ ] Classify scripts as `tracked`, `observed` (experimental), or `unmanaged`.
-- [ ] Require explicit uninstall instructions; refuse automated removal if ownership is uncertain.
+- [x] Introduce `script` provider with explicit installation recipes (source URL, pinned version, SHA-256, interpreter, install/uninstall steps, declared resources). (Exposed as `pkgx recipe` commands, ADR 008.)
+- [x] Download scripts to temporary storage, verify checksum, require trust confirmation before execution.
+- [x] Store installation receipts and transaction metadata in a local registry.
+- [ ] Classify scripts as `tracked`, `observed` (experimental), or `unmanaged`. (tracked/tracked_incomplete/unmanaged implemented; `observed` pending with resource observation.)
+- [x] Require explicit uninstall instructions; refuse automated removal if ownership is uncertain.
 - [ ] Add best-effort resource observation only behind an experimental flag; document platform and security limits.
-- [ ] Reject scripts without integrity metadata by default, with a clearly marked manual override policy if needed.
+- [x] Reject scripts without integrity metadata by default, with a clearly marked manual override policy if needed. (No override exists.)
 
 **Acceptance**: known recipe installs/uninstalls in a sandbox; tampered downloads fail; unknown scripts are never silently deleted; user sees what is and is not tracked.
 
@@ -286,8 +286,9 @@ profile/platform composition, mixed-provider preflight and provider-aware diff.
 M3 has consultation adapters for Pacman, RPM/DNF, Flatpak and Homebrew. Pacman
 preview is an uncertain native --print estimate; Pacman has an experimental
 executor (ADR 007) validated in a disposable user-namespace Arch root.
-M4 has strict recipe check and HTTPS/SHA-256 preparation with no interpreter
-execution, receipts or automatic uninstall. M5 has native orphan audit previews
+M4 has strict recipe check, HTTPS/SHA-256 preparation and confirmed home-scoped
+install/uninstall with receipts (ADR 008), validated in a loopback-only sandbox;
+experimental observation of undeclared effects is not implemented. M5 has native orphan audit previews
 and read-only clean, plus native residual-configuration record inspection;
 caches/residual-config removal remains unsupported. M6 has
 a Ratatui browser with details/provenance/orphans/plans, read-only by default,

@@ -98,6 +98,35 @@ fn render(value: &Value) -> String {
         text.push_str(&lines(&value["warnings"], "Warning: "));
         return text;
     }
+    if value.get("updated_unix_secs").is_some() && value.get("uninstall").is_some() {
+        // Script receipts and their action records: never transaction wording.
+        let mut text = format!(
+            "Recipe {} {}: {}\n",
+            value["name"].as_str().unwrap_or("?"),
+            value["pinned_version"].as_str().unwrap_or(""),
+            value["status"].as_str().unwrap_or("unknown"),
+        );
+        if let Some(resources) = value["resources"].as_array() {
+            for resource in resources {
+                text.push_str(&format!(
+                    "  {} {} ({})\n",
+                    resource["kind"].as_str().unwrap_or("?"),
+                    resource["path"].as_str().unwrap_or("?"),
+                    resource["evidence"]["type"].as_str().unwrap_or("?"),
+                ));
+            }
+        }
+        return text;
+    }
+    if value.get("retained").is_some() {
+        return format!(
+            "Script success: {}\nScript status: {}\n{}{}",
+            value["success"],
+            value["native_status"],
+            lines(&value["errors"], "Error: "),
+            lines(&value["retained"], "Retained for manual review: "),
+        );
+    }
     if value.get("native_status").is_some() {
         return format!(
             "Transaction success: {}\nNative status: {}\nVerified: {}\n{}Rollback attempted: {}\n",

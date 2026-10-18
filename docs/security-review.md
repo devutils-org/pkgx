@@ -30,8 +30,14 @@ Implemented controls and regression evidence:
 - Recipe preparation restricts HTTPS, credentials, redirects, size and time; curlrc is
   disabled. Bounded binary capture enforces size even when native curl's content-length
   handling differs. Hash mismatch discards staging. No interpreter is invoked.
-- Recipe resource declarations remain unverified ownership. Audit never traverses
-  arbitrary data paths, purges configurations or executes native cleanup.
+- Recipe execution (ADR 008) needs trust confirmation, a non-root user, an explicit
+  uninstall action and home-relative declared resources that are absent beforehand.
+  The stored artifact is re-hashed before each run and passed by path to a fixed
+  interpreter. Receipts claim only resources created by the install; uninstall is
+  refused when owned files changed and pkgx itself never deletes resource paths.
+  Scripts are not confined: undeclared side effects run with user permissions.
+- Audit never traverses arbitrary data paths, purges configurations or executes
+  native cleanup.
 - TUI mutation is off by default. Enabling it still requires a reviewed nonempty APT
   plan and exact typed confirmation. A worker reuses core revalidation/journaling.
   Terminal/event errors request cancellation before a worker is joined.
@@ -53,7 +59,7 @@ Remaining boundaries and evidence gaps:
 
 Native PATH, binaries, repositories and package-manager configuration remain trusted.
 No cross-provider atomic transaction, native solver replacement, rollback guarantee
-or script execution sandbox exists. Explicit APT sudo delegation is implemented;
+or script confinement exists. Explicit APT sudo delegation is implemented;
 its native PAM/policy/terminal acceptance remains pending. APT's own lock
 covers its transaction, not the earlier simulation; races can be detected afterward,
 not prevented atomically. Native command cancellation can leave partial changes.
@@ -61,5 +67,5 @@ not prevented atomically. Native command cancellation can leave partial changes.
 The configured Debian/Ubuntu/Arch/Fedora/macOS jobs have not run locally. TUI widget,
 confirmation and worker-cancellation logic is tested. Linux pseudo-terminal demo
 smoke tests and native read-only Pacman checks passed; macOS terminal and real native
-transaction validation remain pending. Script install/uninstall, script receipt
-ownership, cross-provider strict execution and automatic cleanup stay unsupported.
+transaction validation remain pending. Cross-provider strict execution, system-scope
+recipes and observation of undeclared script effects stay unsupported.

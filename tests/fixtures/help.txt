@@ -19,7 +19,7 @@ Commands:
   tui          Open the package browser (read-only unless --allow-apply)
   audit        Inspect native orphan suggestions; never delete paths or packages
   clean        Preview cleanup findings; execution is deliberately unsupported
-  recipe       Validate or verify script artifacts without executing them
+  recipe       Check, verify, install and track script recipes (explicit trust required)
   completions  Print Bash, Zsh or Fish completion definitions
   history      Read transaction records; missing results are running or unknown
   providers    Detect provider binaries and available adapter capabilities

@@ -11,7 +11,7 @@ _pkgx() {
         --state-dir) COMPREPLY=( $(compgen -d -- "$cur") ); return ;;
     esac
     if [[ "$command" == recipe && $COMP_CWORD -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W 'check verify' -- "$cur") )
+        COMPREPLY=( $(compgen -W 'check verify install uninstall list forget' -- "$cur") )
     elif (( COMP_CWORD == 1 )); then
         COMPREPLY=( $(compgen -W 'demo manage managed providers doctor list search info why deps install remove export diff plan apply audit clean history recipe tui completions help' -- "$cur") )
     else

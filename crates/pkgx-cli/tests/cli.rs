@@ -347,3 +347,53 @@ fn no_op_manifest_with_sudo_never_authenticates_or_creates_state() {
     assert_eq!(value["data"]["success"], true);
     assert!(!state.exists());
 }
+#[test]
+fn recipe_install_previews_and_refuses_without_trust_before_any_download() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    std::fs::create_dir(&home).unwrap();
+    let recipe = temp.path().join("tool.toml");
+    std::fs::write(
+        &recipe,
+        "version = 1\nname = \"demo-tool\"\npinned_version = \"1.0\"\nurl = \"https://example.org/i.sh\"\nsha256 = \"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"\ninterpreter = \"sh\"\ninstall = { args = [] }\nuninstall = { args = [\"--uninstall\"] }\nresources = [{ kind = \"file\", path = \"~/.local/bin/demo-tool\" }]\n",
+    )
+    .unwrap();
+    let state = temp.path().join("state");
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_pkgx"))
+            .args(args)
+            .arg("--state-dir")
+            .arg(&state)
+            .env("HOME", &home)
+            // No curl or interpreter can be found: nothing may be downloaded or run.
+            .env("PATH", "")
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap()
+    };
+    let file = recipe.to_str().unwrap();
+    let preview = run(&["recipe", "install", "-f", file, "--dry-run", "--json"]);
+    assert!(preview.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(
+        value["data"]["resolved_resources"][0],
+        home.join(".local/bin/demo-tool").to_str().unwrap()
+    );
+    let refused = run(&["recipe", "install", "-f", file]);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("--yes"));
+    assert!(!state.exists());
+    let listed = run(&["recipe", "list", "--json"]);
+    assert!(listed.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&listed.stdout).unwrap()["data"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        run(&["recipe", "uninstall", "demo-tool", "--dry-run"])
+            .status
+            .code(),
+        Some(1)
+    );
+    assert_eq!(run(&["--sudo", "recipe", "list"]).status.code(), Some(1));
+}

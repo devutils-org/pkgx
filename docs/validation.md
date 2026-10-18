@@ -64,6 +64,18 @@ files owned by the real root are not writable from the namespace, as checked
 before the run. Two bootstrap-only hooks failed inside the namespace; they are
 unrelated to the checked transactions. --sudo was not exercised.
 
+## Script recipe sandbox — 2026-10-18
+
+`tests/sandbox/recipe-userns.sh target/debug/pkgx` runs `tests/sandbox/recipe-checks.sh`
+in bubblewrap with the host bound read-only, private tmpfs /tmp and HOME, and a
+loopback-only network namespace. It serves its own fixture script over HTTPS
+(self-signed CA via CURL_CA_BUNDLE) and passed: tampered digest refused before
+execution; unconfirmed install refused; confirmed install created and recorded a
+file, a symlink and a configuration file (`tracked`); duplicate install refused; a
+user-modified owned file blocked uninstall without running anything; uninstall
+removed owned resources, retained the edited configuration and dropped the receipt;
+a pre-existing user file could not be claimed by a new install.
+
 ## Native and terminal evidence
 
 Pacman 7.1.0 / libalpm 16.0.1 is available in this environment. The actual pkgx binary

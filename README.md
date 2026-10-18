@@ -57,8 +57,11 @@ APT operations after pressing x and typing apply, with core revalidation, journa
 and cancellable worker progress.
 
 Recipe check/verify validate pinned integrity metadata and optionally verify a bounded
-HTTPS download in private temporary storage. Artifacts are discarded, never piped or
-executed. Script installation, uninstall and receipts remain unsupported.
+HTTPS download in private temporary storage without executing it. `recipe install`
+runs a verified script as your user only after trust confirmation, for home-relative
+declared resources that did not exist before, and records a receipt; `recipe
+uninstall` runs the recipe's own uninstall action only while owned files still match
+their receipt (ADR 008). pkgx never deletes resource paths itself.
 
 JSON success output goes to stdout with schema_version 1. New results use `data`;
 list/providers/doctor retain their original top-level fields. Runtime errors go to

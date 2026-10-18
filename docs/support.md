@@ -10,7 +10,7 @@
 | macOS Homebrew | JSON fixture tests | macOS build + inventory smoke | Pending CI |
 | Ratatui | TestBackend + Linux pseudo-terminal demo smoke, typed confirmation, worker cancellation | Unit tests | Native execution terminal/macOS checks pending |
 | Explicit APT sudo | Injected credential/argv/order tests + harmless timeout/cancel subprocesses | Non-root disposable APT checks configured | PAM/terminal acceptance pending |
-| Script recipes | Metadata + simulated checksum/tamper tests | Unit tests | Execution unsupported |
+| Script recipes | Simulated lifecycle tests + real install/uninstall in a loopback-only bubblewrap sandbox | Unit tests | No |
 
 Docker/Podman and APT are absent in the local development sandbox. Pacman 7.1.0
 on the host was used only for read-only inventory, dependency, provenance and
