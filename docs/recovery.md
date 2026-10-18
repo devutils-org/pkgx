@@ -58,7 +58,7 @@ identities, preserving existing native dependency reasons on an idempotent no-op
 APT audit can report native config-files package records. These are not an inventory
 of owned paths, and no purge, residual-file removal or cache deletion is supported.
 
-The TUI is read-only by default. `tui --allow-apply` enables experimental APT execution:
+The TUI is read-only by default. `tui --allow-apply` enables reviewed native execution:
 review an install/removal or manifest plan, press x, type the exact word apply and
 press Enter. A fresh native check still follows. The transaction runs on a worker
 so Ctrl-C can cancel; terminal/event failure also requests cancellation before join.

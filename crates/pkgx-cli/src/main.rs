@@ -152,7 +152,7 @@ enum Commands {
     Tui {
         #[arg(long, value_enum, default_value = "apt")]
         provider: Vec<InventoryProvider>,
-        /// Enable typed confirmation for experimental APT execution.
+        /// Enable typed confirmation for reviewed native execution.
         #[arg(long)]
         allow_apply: bool,
         #[arg(short = 'f', long)]

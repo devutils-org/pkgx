@@ -1,4 +1,4 @@
-//! Read-only by default; experimental APT/Pacman execution requires an opt-in and typed review.
+//! Read-only by default; native execution (APT, Pacman, DNF, Flatpak, Homebrew formulas) requires an opt-in and typed review.
 mod theme;
 
 use crossterm::{
@@ -44,7 +44,7 @@ Cached preview reads the inventory; Enter queries native metadata.
 DEMO means synthetic data, with no native planning or execution.
 
 EXECUTION
-x: review confirmation (requires --allow-apply and an APT or Pacman plan)
+x: review confirmation (requires --allow-apply and a nonempty native plan)
 Type apply and press Enter to execute.
 
 HELP
@@ -793,7 +793,7 @@ pub fn run(
             }
             KeyCode::Char('x') => {
                 if !browser.arm() {
-                    browser.set_page(Ok("Execution is unavailable: enable --allow-apply and review a nonempty APT or Pacman plan first. Other providers have no executor.".into()));
+                    browser.set_page(Ok("Execution is unavailable: enable --allow-apply and review a nonempty native plan first.".into()));
                     browser.clear_review();
                 }
             }
