@@ -179,7 +179,7 @@ Planning and execution are separate: backends can propose native operations; the
 - [ ] Validate on a documented support matrix; run macOS smoke tests.
 - [x] Write installation, security, manifest, backend capability, and recovery documentation.
 - [ ] Provide shell completions, release binaries, changelog, reproducible build instructions where feasible. (Local versioned archives/checksums and deterministic packaging implemented; multi-platform release execution pending.)
-- [ ] Perform security review of script execution, privilege boundaries, and cleanup operations.
+- [x] Perform security review of script execution, privilege boundaries, and cleanup operations. (Internal review recorded in docs/security-review.md; no independent audit.)
 
 **Acceptance**: documented support matrix passes CI; all mutating operations are plan-driven; known limitations are published; release artifacts are verified.
 
@@ -293,15 +293,18 @@ APT/Pacman caches), suggested cleanup (orphans) and manual review (residual reco
 confirmed native cache cleanup and reviewed orphan removal exist (ADR 009);
 residual-configuration purge remains unsupported. M6 has
 a Ratatui browser with details/provenance/orphans/plans, read-only by default,
-with opt-in typed APT confirmation and cancellable worker execution. M7 has expanded
+with opt-in typed confirmation for any executable provider and cancellable worker
+execution. M7 has expanded
 regressions, recovery/security documentation, completion definitions and a manual
 artifact-building workflow; no release has been published or certified.
 
-Local checks use fixtures, injected runners, temporary files, TestBackend and
-read-only native Pacman consultation.
-No host package transaction, downloaded script or cleanup operation has run.
-Docker/Podman and APT are absent here. Pacman 7.1.0 read-only inventory/dependency/provenance checks passed for a 301-package inventory. Configured CI
-for Debian/Ubuntu transactions, Arch/Fedora consultation and macOS smoke has not
-run locally and is not counted as passed. See docs/support.md for limits.
+Local checks use fixtures, injected runners, temporary files and TestBackend.
+Native transactions, recipe scripts and cleanup ran only inside disposable rootless
+roots (tests/sandbox/); no host package transaction, downloaded script or cleanup
+operation has run on the workstation. Configured CI jobs (containers, recipe
+sandbox, macOS smoke) have not run and are not counted as passed. macOS, release
+signing and published artifacts remain pending. See docs/support.md for limits.
 
-Latest local checkpoint: 134 Rust tests and 2 packaging tests passed; see docs/validation.md.
+Latest local checkpoint (2026-10-18): 169 Rust tests and 2 packaging tests passed;
+native scenarios passed in rootless disposable roots for Debian bookworm, Ubuntu
+24.04, Arch, Fedora 44, Flatpak and Homebrew on Linux; see docs/validation.md.

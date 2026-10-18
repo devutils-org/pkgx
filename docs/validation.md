@@ -1,7 +1,7 @@
-# Local validation checkpoint — 2026-10-17
+# Local validation checkpoint — 2026-10-18
 
-Environment: Linux aarch64, rustc 1.99.0 (b940084d7, 2026-09-28), Python 3.14.8.
-Cargo output uses /tmp/pkgx-target because the shared default target is read-only.
+Environment: Linux x86_64 (Arch), rustc 1.99.1 (58cf8f9c3 2026-10-13), Python 3.14.
+Cargo output uses /tmp/pkgx-target. Earlier checkpoints ran on Linux aarch64.
 
 ## Automated checks
 
@@ -13,7 +13,7 @@ CARGO_TARGET_DIR=/tmp/pkgx-target cargo build --release --locked --offline -p pk
 python3 scripts/test_package.py
 ```
 
-134 Rust tests passed, plus 2 Python packaging tests. One standalone ignored Rust
+169 Rust tests passed, plus 2 Python packaging tests. One standalone ignored Rust
 test is a subprocess fixture explicitly invoked by the inherited-pipe regression;
 it does not represent missing product coverage.
 

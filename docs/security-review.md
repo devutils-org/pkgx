@@ -70,3 +70,46 @@ confirmation and worker-cancellation logic is tested. Linux pseudo-terminal demo
 smoke tests and native read-only Pacman checks passed; macOS terminal and real native
 transaction validation remain pending. Cross-provider strict execution, system-scope
 recipes and observation of undeclared script effects stay unsupported.
+
+## Internal review of new boundaries — 2026-10-18
+
+Scope: the Pacman, DNF, Flatpak and Homebrew executors (ADR 007, 010–012), script
+execution and receipts (ADR 008), cleanup execution (ADR 009) and sudo delegation
+for the new providers. This is an internal source review backed by injected-runner
+regressions and the disposable-root runs in validation.md, not an independent audit.
+
+Confirmed properties:
+
+- Every executor rebuilds native arguments from validated identities and the fresh
+  preview; no saved or deserialized command is executed. Identity tokens start with
+  an alphanumeric byte, so no target can be read as an option; DNF targets must be
+  valid NEVRAs and Flatpak remotes/refs are validated tokens.
+- sudo delegation is an allow-list of exact argument prefixes (APT install, Pacman
+  `--sync --needed`/`--remove`, DNF install/remove, the two cache commands) plus
+  validated targets, to fixed system binaries that must match PATH; environment
+  overrides are refused. Flatpak and Homebrew are never run through sudo, and
+  Homebrew is refused as root.
+- Options that would widen a reviewed transaction are never produced: no database
+  refresh or system upgrade (Pacman), no autoremove (DNF `--no-autoremove`,
+  `HOMEBREW_NO_AUTOREMOVE`), no related refs (Flatpak `--no-related`), no
+  force/ignore-dependency/cascade/nosave options. Native verification caught two
+  defaults that would otherwise have widened transactions (Homebrew autoremove,
+  replay skipping OpenPGP checks), and both are now excluded by design.
+- Every executor verifies planned versions/commits and the untouched inventory and
+  reports differences as failures without claiming rollback.
+- Recipe scripts run only as a non-root user after trust confirmation, through a
+  fixed interpreter, from a private store re-hashed before each run. Receipts claim
+  only resources that were absent and then created; pkgx never deletes resource
+  paths. Observation is metadata-only and never authorizes removal.
+- Cache cleanup measures only native cache directories and runs only the native
+  command; orphan cleanup goes through the reviewed removal executor.
+
+Residual risks:
+
+- Recipe scripts inherit the user's environment (with LC_ALL=C) and run unconfined;
+  a trusted script can affect anything the user can.
+- Previews for Pacman, Flatpak and Homebrew are estimates; races between preview
+  and execution are detected afterwards, not prevented.
+- Flatpak system-scope authorization relies on Flatpak's system helper and polkit.
+- The Flatpak local test repository is unsigned; signature handling against real
+  remotes was not exercised.
