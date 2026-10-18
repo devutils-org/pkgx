@@ -1,7 +1,7 @@
 # pkgx
 
 Rust CLI for native package inventory, provenance, conservative plans and declarative
-TOML reconciliation. Native APT execution is experimental; platform CI is configured
+TOML reconciliation of packages and home-relative configuration files. Native APT execution is experimental; platform CI is configured
 but has not run in this development environment.
 
 ```sh
@@ -25,6 +25,8 @@ cargo run -p pkgx-cli -- audit --provider apt
 cargo run -p pkgx-cli -- clean --provider apt --dry-run
 cargo run -p pkgx-cli -- history --limit 20 --offset 0 --json
 cargo run -p pkgx-cli -- tui --provider apt
+cargo run -p pkgx-cli -- file adopt ~/.tmux.conf --dry-run
+cargo run -p pkgx-cli -- file list
 cargo run -p pkgx-cli -- recipe check -f tests/fixtures/recipe.toml
 cargo run -p pkgx-cli -- completions bash
 ```
@@ -63,6 +65,26 @@ plan review. It is read-only by default. `tui --allow-apply` enables experimenta
 APT operations after pressing x and typing apply, with core revalidation, journal
 and cancellable worker progress.
 
+Manifests can also declare configuration files (experimental, ADR 013):
+
+```toml
+[packages.apt]
+install = ["tmux"]
+
+[files."~/.tmux.conf"]
+source = "dotfiles/tmux.conf"   # relative to the manifest
+mode = "0644"
+```
+
+`diff` reports each file as missing, in sync, outdated, drifted, unmanaged conflict,
+unsupported or undeclared. `plan -f` shows a unified diff; `apply -f` writes files
+atomically as your user after package transactions, with its own confirmation, and
+records private receipts. pkgx copies bytes only: no templates, merging, system paths
+or reload actions. Existing files are never overwritten until `pkgx file adopt`
+backs them up and records them; local edits to managed files are reported as drift
+and refused. pkgx never deletes configuration files (`file forget` drops a receipt
+only). See the [manifest reference](docs/manifest.md#configuration-files-experimental).
+
 Recipe check/verify validate pinned integrity metadata and optionally verify a bounded
 HTTPS download in private temporary storage without executing it. `recipe install`
 runs a verified script as your user only after trust confirmation, for home-relative
@@ -92,7 +114,8 @@ cargo build --release --locked -p pkgx-cli
 Tests use fixtures, injected runners, temporary storage, harmless utilities and a
 Ratatui TestBackend. Docker/Podman and APT are unavailable locally. Pacman 7.1.0 is checked
 read-only on the host; Pacman transactions and cleanup ran only in a disposable
-user-namespace Arch root, and recipe install/uninstall only in a loopback-only sandbox.
+user-namespace Arch root, and recipe install/uninstall only in a loopback-only sandbox. Managed configuration
+files are tested only against temporary HOME directories (no sandbox run yet).
 APT (Debian bookworm, Ubuntu 24.04) and DNF5 (Fedora 44) transactions ran in rootless
 disposable roots. Configured CI runs and macOS native validation remain pending. No host package
 transaction, cleanup or installation script has run. See [validation status](docs/support.md) and [local results](docs/validation.md),

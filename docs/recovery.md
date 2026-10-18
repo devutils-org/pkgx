@@ -94,3 +94,13 @@ An unprivileged caller cannot guarantee that privileged/detached descendants hav
 stopped. If cleanup reports a process may still be running, inspect native processes
 and locks before retrying. pkgx does not block forever waiting for an unkillable
 child, and retains a background reaper while the CLI/TUI process remains alive.
+
+## Managed configuration files
+
+File writes (ADR 013) are not journaled; `<state-dir>/files/registry.json` is their
+record. After an interruption, run `pkgx diff -f`: an updated file that was renamed
+before its receipt shows as in sync; a newly created one shows as an unmanaged
+conflict and must be adopted to continue. A leftover `.pkgx-*` temporary file next to
+a target can be deleted manually. A stale `<state-dir>/files/lock` is never removed
+automatically; inspect that no pkgx process runs before deleting it. Adoption backups
+under `<state-dir>/files/backups/<sha256>` are kept until you remove them.

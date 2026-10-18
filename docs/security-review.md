@@ -110,6 +110,11 @@ Residual risks:
   a trusted script can affect anything the user can.
 - Previews for Pacman, Flatpak and Homebrew are estimates; races between preview
   and execution are detected afterwards, not prevented.
+- Managed configuration files (ADR 013) are written as the user after review; a
+  concurrent process can still change a target between the final check and the
+  rename. Previews display file contents, so secrets in manifests are exposed to
+  the terminal. This boundary was added after the review above and has only
+  temporary-directory regressions.
 - Flatpak system-scope authorization relies on Flatpak's system helper and polkit.
 - The Flatpak local test repository is unsigned; signature handling against real
   remotes was not exercised.

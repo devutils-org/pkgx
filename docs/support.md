@@ -11,6 +11,7 @@
 | Ratatui | TestBackend + Linux pseudo-terminal demo smoke, typed confirmation, worker cancellation | Unit tests | Native execution terminal/macOS checks pending |
 | Explicit APT sudo | Injected credential/argv/order tests + harmless timeout/cancel subprocesses | Non-root disposable APT checks configured | PAM/terminal acceptance pending |
 | Script recipes | Simulated lifecycle tests + real install/uninstall in a loopback-only bubblewrap sandbox | Unit tests | No |
+| Managed configuration files (ADR 013) | Unit and CLI tests against temporary HOME/state directories: states, writes, adoption, symlink and stale-review refusals | Unit tests | No; sandbox and macOS pending |
 
 Docker/Podman and APT are absent on the development host. APT and DNF evidence
 comes from rootless debootstrap/dnf5 roots built in user namespaces with the

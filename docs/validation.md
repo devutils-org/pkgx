@@ -13,7 +13,7 @@ CARGO_TARGET_DIR=/tmp/pkgx-target cargo build --release --locked --offline -p pk
 python3 scripts/test_package.py
 ```
 
-169 Rust tests passed, plus 2 Python packaging tests. One standalone ignored Rust
+182 Rust tests passed, plus 2 Python packaging tests. One standalone ignored Rust
 test is a subprocess fixture explicitly invoked by the inherited-pipe regression;
 it does not represent missing product coverage.
 
@@ -21,7 +21,8 @@ Coverage includes native inventories/marks, dependency expressions, provider and
 architecture identities, manifest composition, explicit management grant storage,
 strict removal scope, lock contention/stale state, shared/symlinked paths, native
 cascades, saved-plan expiry, held/critical/purge rejection, unexpected native effects,
-partial failures, journals, recipe tampering and TUI confirmation/navigation.
+partial failures, journals, recipe tampering, managed configuration files (states,
+writes, adoption, symlink and stale-review refusals) and TUI confirmation/navigation.
 A mocked strict APT transaction revalidates its native plan, verifies removal,
 persists its outcome and holds the registry lock. Another test edits the registry
 during native revalidation and confirms no transaction is started.
