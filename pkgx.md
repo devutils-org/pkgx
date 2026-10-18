@@ -189,9 +189,9 @@ Planning and execution are separate: backends can propose native operations; the
 Goal: declare user configuration files (e.g. `~/.tmux.conf`) next to their packages and
 reconcile them with the same diff → plan → apply review flow. This is file ownership,
 not configuration semantics: pkgx copies declared content, it does not understand,
-merge or generate tmux/shell/editor options. Record ADR 013 before any code.
+merge or generate tmux/shell/editor options. Design: [ADR 013](docs/adr/013-managed-config-files.md).
 
-Illustrative schema (to be finalized in ADR 013):
+Illustrative schema (proposed in ADR 013):
 
 ```toml
 [packages.apt]
@@ -207,7 +207,7 @@ source = "dotfiles/nvim/init.lua"
 
 **Tasks**
 
-- [ ] ADR 013: schema (keyed by target, layered like packages, conflicts across layers are errors), versioning impact on `version = 1`, ownership/receipt model, copy vs symlink deployment.
+- [x] ADR 013: schema (keyed by target, layered like packages, conflicts across layers are errors), versioning impact on `version = 1`, ownership/receipt model, copy vs symlink deployment. (Proposed in docs/adr/013-managed-config-files.md; not implemented.)
 - [ ] Parse and validate file declarations: home-relative targets only, no parent traversal, sources confined to the manifest directory (no symlink escape), size limit, literal content only (no templates, variables or interpolation).
 - [ ] Observe target state without mutation: `missing`, `in_sync`, `drifted` (managed file changed locally since its receipt), `unmanaged_conflict` (existing file never written by pkgx), plus non-regular targets.
 - [ ] Integrate files into `diff`, `plan -f` and `apply -f`, after package transactions; previews show a content diff with an explicit warning that file contents are displayed.
@@ -309,7 +309,7 @@ For each milestone:
 - Script receipt format, resource ownership, and secure execution model.
 - Plan serialization, expiration, and recovery after partial execution.
 - Supported OS/distribution and package-manager version matrix.
-- Managed configuration files (M8): copy vs symlink deployment, adoption of existing files, backups, schema versioning, future templating/secrets policy.
+- Managed configuration files (M8): proposed in ADR 013 (copy deployment, explicit adoption with backups, `version = 1` extension); templating/secrets remain open.
 
 **Default recommendation:** Linux-first; APT first; declarative additive manifests; explicit verified script recipes; macOS/Brew after core semantics are stable; TUI after CLI workflows are proven.
 
