@@ -7,6 +7,8 @@
 | Arch Pacman | Fixtures + injected executor tests + disposable user-namespace Arch root: inspection and transactions (tests/sandbox/arch-userns.sh) | Disposable inspection + transactions | CI passed (GitHub Actions run 39143547380); not certified |
 | Fedora 44 RPM/DNF5 | Fixtures + injected executor tests + rootless Fedora root: inspection and transactions (tests/sandbox/fedora-userns.sh) | Disposable inspection + transactions | CI passed (GitHub Actions run 39143547380); not certified |
 | Flatpak default user/system | Scoped injected-runner tests + rootless Arch root with a local repository (tests/sandbox/flatpak-userns.sh) | Not yet configured | No |
+| Alpine apk | Fixtures + injected executor tests; apk-tools 2.14 output in an Alpine 3.22 container | Distroproof Alpine 3.24 (apk-tools 3.0.6): inspection + transactions | Not certified |
+| Gentoo Portage | Fixtures + injected executor tests | Distroproof Gentoo (Portage 3.0.82): inspection + transactions | Not certified |
 | Homebrew | JSON fixtures + injected executor tests + Homebrew 7.0.9 on Linux in a rootless Arch root (tests/sandbox/brew-userns.sh) | macOS build, inventory and formula transactions | CI passed on macOS ({CI}); casks unsupported |
 | Ratatui | TestBackend + Linux pseudo-terminal demo smoke, typed confirmation, worker cancellation | Unit tests | Native execution terminal/macOS checks pending |
 | Explicit APT sudo | Injected credential/argv/order tests + harmless timeout/cancel subprocesses | Non-root disposable APT checks configured | PAM/terminal acceptance pending |

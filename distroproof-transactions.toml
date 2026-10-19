@@ -47,6 +47,16 @@ image = "ubuntu-20.04"
 name = "transactions-ubuntu-22.04"
 image = "ubuntu-22.04"
 
+[[target]]
+name = "transactions-alpine"
+image = "alpine"
+
+[[target]]
+name = "transactions-gentoo"
+image = "gentoo"
+memory = "3G"
+timeout = "45m"
+
 [run]
 setup = "sh scripts/distroproof/setup.sh"
 command = "sh scripts/distroproof/sweep.sh"

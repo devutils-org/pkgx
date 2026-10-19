@@ -11,7 +11,9 @@ import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
-PROVIDERS = {'apt', 'pacman', 'dnf', 'flatpak', 'brew'}
+PROVIDERS = {'apt', 'pacman', 'dnf', 'flatpak', 'brew', 'apk', 'portage'}
+# Providers with a native witness, by the binary envprobe reports.
+NATIVE = {'apt': 'apt', 'pacman': 'pacman', 'dnf': 'dnf', 'apk': 'apk', 'portage': 'emerge'}
 BASE = {'version', 'providers', 'doctor', 'demo', 'completion-bash',
         'completion-zsh', 'completion-fish', 'missing-history',
         'inspection-no-state', 'managed-files'}
@@ -70,13 +72,16 @@ def judge(target, cell, expected, builds):
         for provider in advertised:
             name = provider['provider']
             supported = provider['available'] and provider['compatibility']['minimum_met'] is True
-            if provider['available'] and name in {'apt', 'pacman', 'dnf'}:
-                require(name in managers, 'provider presence disagrees with envprobe: ' + name)
+            if provider['available'] and name in NATIVE:
+                require(NATIVE[name] in managers, 'provider presence disagrees with envprobe: ' + name)
             require(supported == providers[name]['supported'], 'provider support disagrees with diagnostics')
             require(not supported or 'inventory' in provider['capabilities'], 'supported adapter lacks inventory capability')
             required = {'inventory-' + name} if supported else {'refusal-' + name}
-            if supported and name in {'apt', 'pacman', 'dnf'}:
-                required |= {prefix + '-' + name for prefix in ('native-inventory', 'info', 'why', 'deps', 'search', 'export', 'roundtrip')}
+            if supported and name in NATIVE:
+                prefixes = ('native-inventory', 'info', 'why', 'search', 'export', 'roundtrip')
+                if name in {'apt', 'pacman', 'dnf'}:
+                    prefixes += ('deps',)
+                required |= {prefix + '-' + name for prefix in prefixes}
                 count = checks.get('native-inventory-' + name, {}).get('detail', {}).get('packages', 0)
                 require(count > 0, 'native witness must include installed packages')
             require(required <= set(checks), flavor + ': missing provider checks ' + repr(required - set(checks)))
@@ -85,7 +90,9 @@ def judge(target, cell, expected, builds):
     transactions = cell['transactions']
     if expected['name'].startswith('transactions-'):
         expected_scripts = ({'transactions.sh', 'privilege.sh'} if expected['image'].startswith(('debian-', 'ubuntu-')) else
-                            {'pacman-transactions.sh'} if expected['image'] == 'arch' else {'dnf-transactions.sh'})
+                            {'pacman-transactions.sh'} if expected['image'] == 'arch' else
+                            {'apk-transactions.sh'} if expected['image'] == 'alpine' else
+                            {'portage-transactions.sh'} if expected['image'] == 'gentoo' else {'dnf-transactions.sh'})
         require({t['name'] for t in transactions} == expected_scripts and len(transactions) == len(expected_scripts), 'missing transaction checks')
         require(all(t['code'] == 0 for t in transactions), 'transaction check failed')
     else:

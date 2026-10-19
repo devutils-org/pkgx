@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -55,7 +56,29 @@ def native_inventory(provider):
         raw = success(execute(['rpm', '-qa', '--qf', '%{NAME}\t%{ARCH}\t%{EPOCHNUM}:%{VERSION}-%{RELEASE}\n']))['stdout']
         return Counter(tuple(row.split('\t')) for row in raw.splitlines()
                        if row.split('\t')[0] != 'gpg-pubkey')
+    if provider == 'apk':
+        # apk's own installed database, not `apk list`, which xpac reads.
+        values = []
+        for record in Path('/lib/apk/db/installed').read_text().split('\n\n'):
+            fields = dict(line.split(':', 1) for line in record.splitlines() if line[1:2] == ':')
+            if 'P' in fields:
+                values.append((fields['P'], fields['A'], fields['V']))
+        return Counter(values)
+    if provider == 'portage':
+        # Portage's own listing, split by the specification's version syntax
+        # here, beside xpac's own splitting of the database directories.
+        version = re.compile(r'-(\d+(\.\d+)*[a-z]?((_alpha|_beta|_pre|_rc|_p)\d*)*(-r\d+)?)$')
+        raw = success(execute(['portageq', 'match', '/', '*/*']))['stdout']
+        values = []
+        for cpv in raw.split():
+            match = version.search(cpv)
+            slot = (Path('/var/db/pkg') / cpv / 'SLOT').read_text().strip().split('/')[0]
+            values.append((cpv[:match.start()], slot, match.group(1)))
+        return Counter(values)
     raise ValueError('no native inventory witness for ' + provider)
+
+
+SAMPLE = {'apt': 'bash', 'pacman': 'bash', 'dnf': 'bash', 'apk': 'busybox', 'portage': 'app-shells/bash'}
 
 
 def sweep(flavor, info, cell):
@@ -126,7 +149,7 @@ def sweep(flavor, info, cell):
                 check('refusal-' + name, refuse)
                 continue
             inventory = check('inventory-' + name, lambda name=name: document(cli('list', '--provider', name, '--json')))
-            if name in ('apt', 'pacman', 'dnf'):
+            if name in SAMPLE:
                 def compare(name=name, inventory=inventory):
                     expected = native_inventory(name)
                     observed = Counter((p['id']['name'], p['id']['architecture_or_scope'], p['version'])
@@ -136,8 +159,9 @@ def sweep(flavor, info, cell):
                                 ', extra=' + repr(list((observed-expected).items())[:10]))
                     return {'packages': sum(expected.values())}
                 check('native-inventory-' + name, compare)
-                for command in ('info', 'why', 'deps'):
-                    check(command + '-' + name, lambda command=command, name=name: document(cli(command, name + ':bash', '--json')))
+                # apk and Portage have no installed dependency query yet.
+                for command in ('info', 'why') + (('deps',) if name in ('apt', 'pacman', 'dnf') else ()):
+                    check(command + '-' + name, lambda command=command, name=name: document(cli(command, name + ':' + SAMPLE[name], '--json')))
                 check('search-' + name, lambda name=name: document(cli('search', 'bash', '--installed', '--provider', name, '--json')))
                 manifest = str(Path(tmp) / (name + '.toml'))
                 check('export-' + name, lambda name=name, manifest=manifest: success(cli('export', '--provider', name, '-o', manifest)))
@@ -175,9 +199,11 @@ def main():
             assert_true(os.getuid() == 0, 'transaction matrix must run as guest root')
             image = os.environ['DP_IMAGE']
             scripts = (['transactions.sh', 'privilege.sh'] if image.startswith(('debian-', 'ubuntu-')) else
-                       ['pacman-transactions.sh'] if image == 'arch' else ['dnf-transactions.sh'])
+                       ['pacman-transactions.sh'] if image == 'arch' else
+                       ['apk-transactions.sh'] if image == 'alpine' else
+                       ['portage-transactions.sh'] if image == 'gentoo' else ['dnf-transactions.sh'])
             for script in scripts:
-                result = execute(['sh', 'tests/containers/' + script], timeout=480)
+                result = execute(['sh', 'tests/containers/' + script], timeout=2400)
                 result['name'] = script
                 cell['transactions'].append(result)
                 print('transaction ' + script + ': ' + str(result['code']), flush=True)

@@ -66,6 +66,8 @@ image = "arch"
 [[target]]
 name = "gentoo"
 image = "gentoo"
+memory = "2G"
+timeout = "20m"
 
 [[target]]
 name = "alpine"

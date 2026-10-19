@@ -68,8 +68,9 @@ For every detected supported APT/Pacman/DNF provider it also checks:
 - export → diff with no missing identity → plan with no package operations.
 
 Every absent or too-old provider must fail explicitly with a versioned error.
-Gentoo/Alpine exercise startup, provider refusals and managed files; xpac does
-not implement Portage/APK. DNF4 on Rocky is tested for RPM consultation; native
+Alpine and Gentoo exercise the apk and Portage providers (ADR 014, ADR 015): their
+setup refreshes the package indexes the images lack, as a user does once, and changes
+no package. DNF4 on Rocky is tested for RPM consultation; native
 transaction execution still needs DNF5. Flatpak and Homebrew are not installed
 by this matrix; their existing sandbox/macOS checks remain separate.
 
@@ -189,4 +190,28 @@ This covers APT 1.6 (Ubuntu 18.04), 1.8 (Debian 10), 2.0 (Ubuntu 20.04),
 for these scenarios. Newer Debian 13/sid APT consultation is checked by the
 inspection matrix; their transactions are not separately run here. Fedora 43/44
 exercise DNF5 and Arch exercises Pacman. This does not expand DNF execution
-to DNF4, or add APK/Portage backends.
+to DNF4.
+
+### apk and Portage checkpoint — 2026-10-19
+
+The new providers ran in fresh disposable VMs with the installed static musl
+archive. Inspection (as the ordinary guest user): xpac's inventory equals an
+independent native witness -- apk's own installed database
+(`/lib/apk/db/installed`) for 200 packages, and `portageq match` split by the
+specification's version syntax in Python for 418 -- then info, why, search and
+export → diff → plan with no operation. Transactions (as guest root):
+`tests/containers/apk-transactions.sh` and `tests/containers/portage-transactions.sh`.
+
+| Image | Native version | Inspection | Transactions |
+|---|---|---|---|
+| alpine (3.24.1) | apk-tools 3.0.6 | pass | pass |
+| gentoo | Portage 3.0.82.2 | pass | pass |
+
+apk-tools 2.14 (Alpine 3.22) output, flags and WORLD behaviour were checked in a
+container; no VM image of it is in the matrix. Installing Omniscient's
+measurement witnesses through xpac then found two defects these scenarios did
+not: apk right-aligns its transaction counter from ten operations on
+(`( 1/10)`), and emerge rebuilds a dependency at its installed version (`R`,
+bpftrace's zlib); both are fixed and covered by tests. Two QEMU processes of the
+Gentoo cell were killed by an outside SIGKILL on a loaded host; the third run,
+traced, received none and passed.

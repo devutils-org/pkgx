@@ -29,6 +29,17 @@ for flavor in gnu musl; do
 done
 mkdir -p /usr/local/bin
 ln -sf /opt/xpac/musl/xpac /usr/local/bin/xpac
+# Alpine and Gentoo images carry no package index: refreshed once, as a user
+# does after installing, so previews resolve. No package changes here.
+case "$DP_IMAGE" in
+    alpine) apk update ;;
+    # The stage's binary host is configured but not enabled, as a user who
+    # wants binaries enables it.
+    # A mirror caught mid-update fails Portage's manifest verification
+    # ("Manifest mismatch for lastreplicate"): the sync is tried again.
+    gentoo) emerge --sync --quiet || { sleep 30; emerge --sync --quiet; } || { sleep 60; emerge --sync --quiet; }
+            printf '%s\n' 'FEATURES="${FEATURES} getbinpkg"' >> /etc/portage/make.conf ;;
+esac
 # Bind subsequent mutating checks to the guest setup and its target.
 printf '%s\n' "$DP_TARGET" > /etc/xpac-distroproof-guest
 if [ "${DP_TARGET#transactions-}" != "$DP_TARGET" ]; then
@@ -40,6 +51,7 @@ if [ "${DP_TARGET#transactions-}" != "$DP_TARGET" ]; then
     case "$DP_IMAGE" in
         debian-*|ubuntu-*) apt-get update; apt-get install -y sudo ;;
         arch) pacman -Sy --noconfirm ;;
+        alpine|gentoo) : ;; # indexes refreshed below for every cell.
         fedora-*) : ;; # dnf5 fetches metadata inside its own checks.
         *) echo "unsupported transaction image: $DP_IMAGE" >&2; exit 1 ;;
     esac
