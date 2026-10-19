@@ -19,7 +19,7 @@ fn doctor_json_without_any_provider() {
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema_version"], 1);
     let providers = value["providers"].as_array().unwrap();
-    assert_eq!(providers.len(), 5);
+    assert_eq!(providers.len(), 7);
     assert!(providers.iter().all(|p| p["available"] == false));
 }
 #[test]

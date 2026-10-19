@@ -16,6 +16,8 @@ pub const SUDO: &str = "/usr/bin/sudo";
 pub const APT: &str = "/usr/bin/apt-get";
 pub const PACMAN: &str = "/usr/bin/pacman";
 pub const DNF: &str = "/usr/bin/dnf5";
+pub const APK: &str = "/sbin/apk";
+pub const EMERGE: &str = "/usr/bin/emerge";
 pub trait SudoAuthenticator {
     fn authenticate(&self, canceled: &AtomicBool) -> Result<(), Error>;
 }
@@ -89,7 +91,16 @@ impl CommandRunner for SudoAptRunner<'_> {
             {
                 PACMAN
             }
-            _ => return Err(Error::Safety("sudo delegation accepts only an executor-marked APT, Pacman or DNF transaction or cache cleanup with no environment overrides".into())),
+            "apk" if template_transaction(&[crate::apk::APK_ADD, crate::apk::APK_DEL], &spec.args) => APK,
+            "emerge"
+                if template_transaction(
+                    &[crate::portage::EMERGE_INSTALL, crate::portage::EMERGE_REMOVE],
+                    &spec.args,
+                ) =>
+            {
+                EMERGE
+            }
+            _ => return Err(Error::Safety("sudo delegation accepts only an executor-marked APT, Pacman, DNF, apk or Portage transaction or cache cleanup with no environment overrides".into())),
         };
         let mut elevated = CommandSpec::new(SUDO, &["-n", "-u", "root", "--", program]);
         elevated.args.extend(spec.args.iter().cloned());
@@ -112,12 +123,17 @@ fn dnf_transaction(args: &[String]) -> bool {
 }
 /// Exactly an executor template followed by non-option targets.
 fn pacman_transaction(args: &[String]) -> bool {
-    [
-        crate::execution::PACMAN_INSTALL,
-        crate::execution::PACMAN_REMOVE,
-    ]
-    .iter()
-    .any(|template| {
+    template_transaction(
+        &[
+            crate::execution::PACMAN_INSTALL,
+            crate::execution::PACMAN_REMOVE,
+        ],
+        args,
+    )
+}
+/// Exactly one of `templates` (program excluded) followed by non-option targets.
+fn template_transaction(templates: &[&[&str]], args: &[String]) -> bool {
+    templates.iter().any(|template| {
         let prefix = &template[1..];
         args.len() > prefix.len()
             && args.iter().zip(prefix.iter()).all(|(a, b)| a == b)
@@ -187,7 +203,7 @@ pub fn validate_environment(
         ));
     }
     if !overrides.is_empty() {
-        return Err(Error::Safety("--sudo refuses APT_CONFIG, DPKG_ROOT and DPKG_ADMINDIR overrides; inspection and privileged execution must use the same native database/configuration".into()));
+        return Err(Error::Safety(format!("--sudo refuses the {} override; inspection and privileged execution must use the same native database/configuration", overrides.join(", "))));
     }
     Ok(())
 }
@@ -205,6 +221,8 @@ fn verify_environment(provider: crate::ProviderId) -> Result<(), Error> {
         ),
         crate::ProviderId::Pacman => ("pacman", PACMAN, &[]),
         crate::ProviderId::Dnf => ("dnf5", DNF, &[]),
+        crate::ProviderId::Apk => ("apk", APK, &[]),
+        crate::ProviderId::Portage => ("emerge", EMERGE, &["PORTAGE_CONFIGROOT", "ROOT", "EROOT"]),
         _ => {
             return Err(Error::Unsupported(format!(
                 "sudo delegation for {provider}"

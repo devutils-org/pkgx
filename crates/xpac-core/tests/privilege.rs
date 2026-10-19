@@ -194,3 +194,70 @@ fn cooperative_cleanup_of_a_harmless_child_remains_bounded() {
     ));
     assert!(start.elapsed() < Duration::from_secs(2));
 }
+#[test]
+fn apk_and_emerge_are_delegated_as_their_executor_templates_alone() {
+    let inner = Runner::default();
+    let runner = SudoAptRunner::new(&inner);
+    for (template, path, target) in [
+        (xpac_core::apk::APK_ADD, xpac_core::privilege::APK, "strace"),
+        (xpac_core::apk::APK_DEL, xpac_core::privilege::APK, "strace"),
+        (
+            xpac_core::portage::EMERGE_INSTALL,
+            xpac_core::privilege::EMERGE,
+            "=dev-debug/strace-7.1",
+        ),
+        (
+            xpac_core::portage::EMERGE_REMOVE,
+            xpac_core::privilege::EMERGE,
+            "=dev-debug/strace-7.1",
+        ),
+    ] {
+        let mut spec = CommandSpec::new(template[0], &template[1..]);
+        spec.args.push(target.into());
+        spec.requires_privilege = true;
+        runner
+            .run(&spec, Duration::from_secs(1800), &AtomicBool::new(false))
+            .unwrap();
+        let calls = inner.calls.lock().unwrap();
+        let command = calls.last().unwrap();
+        assert_eq!(command.program, SUDO);
+        assert_eq!(&command.args[..5], &["-n", "-u", "root", "--", path]);
+        assert_eq!(&command.args[5..], spec.args);
+    }
+    let calls = inner.calls.lock().unwrap().len();
+    for args in [
+        vec!["add", "--allow-untrusted", "--", "strace"],
+        vec![
+            "add",
+            "--no-interactive",
+            "--no-progress",
+            "--",
+            "--force-overwrite",
+        ],
+        vec![
+            "add",
+            "--simulate",
+            "--no-interactive",
+            "--no-progress",
+            "--",
+            "strace",
+        ],
+    ] {
+        let mut spec = CommandSpec::new("apk", &args);
+        spec.requires_privilege = true;
+        assert!(runner
+            .run(&spec, Duration::from_secs(30), &AtomicBool::new(false))
+            .is_err());
+    }
+    for args in [
+        vec!["--ask=n", "--unmerge", "--", "=dev-debug/strace-7.1"],
+        vec!["--ask=n", "--update", "--deep", "@world"],
+    ] {
+        let mut spec = CommandSpec::new("emerge", &args);
+        spec.requires_privilege = true;
+        assert!(runner
+            .run(&spec, Duration::from_secs(30), &AtomicBool::new(false))
+            .is_err());
+    }
+    assert_eq!(inner.calls.lock().unwrap().len(), calls);
+}

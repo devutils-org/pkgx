@@ -4,7 +4,7 @@ Implementation, local native validation and hosted CI evidence are distinct.
 The [Distroproof matrix](distroproof.md) records the measured Linux coverage.
 CLI adapter creation requires a recognizable native version at or above these implementation targets:
 APT 1.6, Pacman 6.0, DNF 4.0 (including DNF5 for RPM consultation), Flatpak 1.14,
-Homebrew 4.0. Older or unrecognized versions are refused. These are policy targets,
+Homebrew 4.0, apk-tools 2.12 (3.x included), Portage 3.0. Older or unrecognized versions are refused. These are policy targets,
 not claims that every newer release has been tested. Provider diagnostics expose
 the parsed version, minimum-target check and `certified: false`.
 
@@ -15,6 +15,8 @@ the parsed version, minimum-target check and `certified: false`.
 | DNF | RPM installed database | Installed records / reason unknown | Unsupported | dnf5 `--store` resolved transaction | Experimental, confirmed (ADR 010) | Unsupported |
 | Flatpak | Default user and system installations | Installed records / reason unknown | Unsupported | Single-remote ref/commit/runtime preview (uncertain) | Experimental, confirmed, apps-only removal (ADR 011) | Unsupported |
 | Homebrew | JSON v2, installed kegs/casks | Installed records / receipt reason when available | Unsupported | Formula `--dry-run` (uncertain) | Experimental, confirmed, formulae only (ADR 012) | Dependency leaves with native mark checks |
+| apk | `apk list --installed` + WORLD constraints | Installed records / WORLD mark | Unsupported | `--simulate` against local indexes (uncertain) | Experimental, confirmed, versions verified after (ADR 014) | Unsupported |
+| Portage | Installed database (`/var/db/pkg`) + world set | Installed records / world selection | Unsupported | `emerge --pretend` (uncertain); removal `--depclean` | Experimental, confirmed, pinned `=cat/name-version` (ADR 015) | Unsupported |
 
 Examples of fully qualified identities:
 
@@ -26,9 +28,12 @@ flatpak:app/org.example.App/x86_64/stable:user
 flatpak:runtime/org.example.Platform/x86_64/stable:system
 brew:curl:formula
 brew:homebrew/cask/firefox:cask
+apk:strace:x86_64
+portage:dev-lang/python:3.12
 ```
 
-APT, Pacman and RPM permit scope-free lookup when installed matching is unambiguous.
+APT, Pacman, RPM and apk permit scope-free lookup when installed matching is unambiguous;
+a Portage identity's scope is its slot, needed only when several slots are installed.
 Flatpak requires kind, full ID, architecture, branch and scope. Named custom system
 Flatpak installations are not queried; only default user/system are covered. Localized
 or malformed native output fails instead of returning a misleading empty inventory.

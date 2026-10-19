@@ -20,6 +20,8 @@ fn minimum(provider: ProviderId) -> NativeVersion {
         ProviderId::Dnf => (4, 0),
         ProviderId::Flatpak => (1, 14),
         ProviderId::Brew => (4, 0),
+        ProviderId::Apk => (2, 12),
+        ProviderId::Portage => (3, 0),
         ProviderId::Script => (1, 0),
     };
     NativeVersion {
@@ -35,6 +37,10 @@ pub fn reported_line(provider: ProviderId, output: &str) -> Option<&str> {
         ProviderId::Apt => lines().find(|line| line.starts_with("apt ")),
         ProviderId::Flatpak => lines().find(|line| line.starts_with("Flatpak ")),
         ProviderId::Brew => lines().find(|line| line.starts_with("Homebrew ")),
+        // `apk-tools 2.14.12, compiled for x86_64.`, `apk-tools 3.0.6-r0, ...`
+        ProviderId::Apk => lines().find(|line| line.starts_with("apk-tools ")),
+        // `Portage 3.0.82.2 (python 3.14.7-final-0, ...)`, after any warnings.
+        ProviderId::Portage => lines().find(|line| line.starts_with("Portage ")),
         ProviderId::Dnf => lines().next(),
         ProviderId::Script => None,
     }

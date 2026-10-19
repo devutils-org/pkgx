@@ -1,3 +1,4 @@
+pub mod apk;
 pub mod apt;
 pub mod audit;
 pub mod backend;
@@ -13,6 +14,7 @@ pub mod journal;
 pub mod managed;
 pub mod manifest;
 pub mod planner;
+pub mod portage;
 pub mod privilege;
 pub mod providers;
 pub mod recipe;
@@ -30,6 +32,8 @@ pub enum ProviderId {
     Dnf,
     Flatpak,
     Brew,
+    Apk,
+    Portage,
     Script,
 }
 

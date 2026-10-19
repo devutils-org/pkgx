@@ -312,11 +312,16 @@ fn run_verified(
                     }
                 }
             }
+            // An operation without a scope (apk and emerge previews name no
+            // architecture or slot) covers its name in every scope, as the
+            // checks above match it.
             let touched = |id: &PackageId| {
-                current
-                    .operations
-                    .iter()
-                    .any(|operation| operation.package == *id)
+                current.operations.iter().any(|operation| {
+                    operation.package == *id
+                        || (operation.package.architecture_or_scope.is_none()
+                            && operation.package.provider == id.provider
+                            && operation.package.name == id.name)
+                })
             };
             let untouched = |packages: &[crate::InstalledPackage]| {
                 let mut rows: Vec<_> = packages
@@ -376,6 +381,8 @@ pub fn executable(provider: crate::ProviderId) -> bool {
             | crate::ProviderId::Dnf
             | crate::ProviderId::Flatpak
             | crate::ProviderId::Brew
+            | crate::ProviderId::Apk
+            | crate::ProviderId::Portage
     )
 }
 fn single_provider(
@@ -419,6 +426,9 @@ pub fn apply_recorded(
         ),
         crate::ProviderId::Brew => apply_brew_guarded(
             runner, preview, install, remove, confirmed, canceled, journal, None,
+        ),
+        provider @ (crate::ProviderId::Apk | crate::ProviderId::Portage) => apply_native_guarded(
+            provider, runner, preview, install, remove, confirmed, canceled, journal, None,
         ),
         provider => Err(Error::Unsupported(format!(
             "{provider} execution; no provider fallback is performed"
@@ -482,6 +492,20 @@ pub fn apply_saved(
         crate::ProviderId::Dnf => {
             let check = || saved.validate_at(unix_now()?);
             apply_dnf_guarded(
+                runner,
+                &saved.plan,
+                &saved.install,
+                &saved.remove,
+                confirmed,
+                canceled,
+                journal,
+                Some(&check),
+            )
+        }
+        provider @ (crate::ProviderId::Apk | crate::ProviderId::Portage) => {
+            let check = || saved.validate_at(unix_now()?);
+            apply_native_guarded(
+                provider,
                 runner,
                 &saved.plan,
                 &saved.install,
@@ -913,6 +937,108 @@ fn apply_flatpak_guarded(
                     .get("active_commit_prefix")
                     .is_some_and(|prefix| !prefix.is_empty() && commit.starts_with(prefix.as_str()))
         },
+    )
+}
+/// apk and Portage: the preview is repeated and must be unchanged, then one
+/// executor-built transaction names the reviewed requests -- by name for apk,
+/// which can pin a version only by recording it in WORLD for good; as
+/// `=category/name-version` for emerge -- and every reviewed version, explicit
+/// mark and the untouched inventory are verified afterwards.
+#[allow(clippy::too_many_arguments)]
+fn apply_native_guarded(
+    provider: crate::ProviderId,
+    runner: &dyn CommandRunner,
+    preview: &Plan,
+    install: &[PackageId],
+    remove: &[PackageId],
+    confirmed: bool,
+    canceled: &AtomicBool,
+    journal: Option<&crate::journal::Journal>,
+    guard: Option<&dyn Fn() -> Result<(), Error>>,
+) -> Result<ExecutionRecord, Error> {
+    if let Some(check) = guard {
+        check()?;
+    }
+    if canceled.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(Error::Canceled(format!("{provider} execution")));
+    }
+    if !confirmed {
+        return Err(Error::Safety(
+            "execution requires explicit confirmation".into(),
+        ));
+    }
+    if single_provider(install, remove)? != provider {
+        return Err(Error::InvalidInput("provider mismatch".into()));
+    }
+    let backend = crate::providers::NativeBackend { provider, runner };
+    let current = backend.plan(install, remove)?;
+    if &current != preview {
+        return Err(Error::Safety(
+            "plan is stale; inspect a new plan before applying".into(),
+        ));
+    }
+    if let Some(check) = guard {
+        check()?;
+    }
+    if current.operations.is_empty() {
+        return Ok(ExecutionRecord {
+            success: true,
+            native_status: None,
+            verified: true,
+            errors: vec![],
+            rollback_attempted: false,
+            observed_before: current.observed_state_fingerprint.clone(),
+            observed_after: Some(current.observed_state_fingerprint.clone()),
+        });
+    }
+    let apk = provider == crate::ProviderId::Apk;
+    let template = match (apk, remove.is_empty()) {
+        (true, true) => crate::apk::APK_ADD,
+        (true, false) => crate::apk::APK_DEL,
+        (false, true) => crate::portage::EMERGE_INSTALL,
+        (false, false) => crate::portage::EMERGE_REMOVE,
+    };
+    fn reviewed(apk: bool, operation: &crate::Operation) -> Option<&str> {
+        if apk {
+            crate::apk::reviewed_version(operation)
+        } else {
+            crate::portage::reviewed_version(operation)
+        }
+    }
+    let mut spec = CommandSpec::new(template[0], &template[1..]);
+    spec.requires_privilege = true;
+    for id in install.iter().chain(remove) {
+        // A request apk or emerge left out is already installed and selected.
+        let Some(operation) = current
+            .operations
+            .iter()
+            .find(|operation| operation.package.name == id.name)
+        else {
+            continue;
+        };
+        let version = reviewed(apk, operation)
+            .ok_or_else(|| Error::Safety("cannot determine reviewed native version".into()))?;
+        spec.args
+            .push(if apk || operation.kind == OperationKind::MarkExplicit {
+                id.name.clone()
+            } else {
+                format!("={}-{version}", id.name)
+            });
+    }
+    if spec.args.len() == template.len() - 1 {
+        return Err(Error::Safety(format!(
+            "reviewed {provider} plan has no requested target"
+        )));
+    }
+    run_verified(
+        runner,
+        &backend,
+        &current,
+        &spec,
+        canceled,
+        journal,
+        guard,
+        &|operation, package| reviewed(apk, operation) == Some(package.version.as_str()),
     )
 }
 /// Executor-built Pacman transactions; sudo delegation accepts only these prefixes.

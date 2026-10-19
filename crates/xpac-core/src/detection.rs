@@ -19,6 +19,8 @@ pub fn detect(runner: &dyn CommandRunner, os: &str) -> Vec<ProviderStatus> {
         (ProviderId::Dnf, "dnf", "--version"),
         (ProviderId::Flatpak, "flatpak", "--version"),
         (ProviderId::Brew, "brew", "--version"),
+        (ProviderId::Apk, "apk", "--version"),
+        (ProviderId::Portage, "emerge", "--version"),
     ]
     .into_iter()
     .map(|(provider, binary, flag)| {
@@ -74,6 +76,9 @@ pub fn detect(runner: &dyn CommandRunner, os: &str) -> Vec<ProviderStatus> {
                         capabilities.extend([Capability::Inventory, Capability::Dependencies])
                     }
                     ProviderId::Flatpak => capabilities.push(Capability::Inventory),
+                    ProviderId::Apk | ProviderId::Portage => {
+                        capabilities.extend([Capability::Inventory, Capability::DryRun])
+                    }
                     ProviderId::Brew => {
                         capabilities.extend([Capability::Inventory, Capability::Dependencies, Capability::Orphans])
                     }

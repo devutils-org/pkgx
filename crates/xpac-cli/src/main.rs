@@ -18,7 +18,7 @@ struct Cli {
     /// Print versioned JSON results (export and completions emit native text).
     #[arg(long, global = true)]
     json: bool,
-    /// Use sudo only for confirmed APT/Pacman/DNF transactions and cleanup; previews stay unprivileged.
+    /// Use sudo only for confirmed APT/Pacman/DNF/apk/Portage transactions and cleanup; previews stay unprivileged.
     #[arg(long, global = true)]
     sudo: bool,
     /// Dedicated private transaction directory; inspection never creates it.
@@ -37,6 +37,8 @@ enum InventoryProvider {
     Dnf,
     Flatpak,
     Brew,
+    Apk,
+    Portage,
 }
 impl From<InventoryProvider> for ProviderId {
     fn from(value: InventoryProvider) -> Self {
@@ -46,6 +48,8 @@ impl From<InventoryProvider> for ProviderId {
             InventoryProvider::Dnf => Self::Dnf,
             InventoryProvider::Flatpak => Self::Flatpak,
             InventoryProvider::Brew => Self::Brew,
+            InventoryProvider::Apk => Self::Apk,
+            InventoryProvider::Portage => Self::Portage,
         }
     }
 }

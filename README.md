@@ -47,7 +47,7 @@ xpac plan -f examples/system.toml       # review a manifest
 xpac apply -f examples/system.toml --dry-run
 ```
 
-APT, Pacman, RPM/DNF, Flatpak and Homebrew consultation are implemented.
+APT, Pacman, RPM/DNF, Flatpak, Homebrew, apk and Portage consultation are implemented.
 Execution support differs by provider: see the [backend matrix](docs/backends.md).
 
 ## Documentation

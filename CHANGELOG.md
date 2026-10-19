@@ -2,6 +2,11 @@
 
 ## 0.1.0 — unreleased
 
+- Add the apk (Alpine, apk-tools 2.12 and 3.x) and Portage (Gentoo, 3.0) providers:
+  inventory with WORLD/world-set marks, native previews (`apk --simulate`, `emerge
+  --pretend`) and confirmed, verified execution; Portage removal is `--depclean`
+  of the reviewed version (ADR 014, ADR 015). Run them in Distroproof's Alpine
+  and Gentoo inspection and transaction cells.
 - Add an installed-release Distroproof matrix on 16 Linux images plus root and
   lockdown variants, with envprobe cross-checks and independent native inventories.
 - Build GNU Linux archives against glibc 2.17 and verify the symbol floor; also

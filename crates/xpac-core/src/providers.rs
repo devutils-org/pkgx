@@ -33,6 +33,8 @@ pub fn backend<'a>(
         ProviderId::Dnf => "dnf",
         ProviderId::Flatpak => "flatpak",
         ProviderId::Brew => "brew",
+        ProviderId::Apk => "apk",
+        ProviderId::Portage => "emerge",
         ProviderId::Script => unreachable!(),
     };
     crate::version::require_target(
@@ -334,6 +336,12 @@ impl Backend for NativeBackend<'_> {
                 Capability::Orphans,
                 Capability::DryRun,
             ],
+            ProviderId::Apk | ProviderId::Portage => vec![
+                Capability::Inventory,
+                Capability::Install,
+                Capability::Remove,
+                Capability::DryRun,
+            ],
             _ => vec![],
         }
     }
@@ -393,6 +401,8 @@ impl Backend for NativeBackend<'_> {
                 self.runner,
                 CommandSpec::new("brew", &["info", "--json=v2", "--installed"]),
             )?),
+            ProviderId::Apk => crate::apk::inventory(self.runner),
+            ProviderId::Portage => crate::portage::inventory(self.runner),
             _ => Err(Error::Unsupported("native inventory adapter".into())),
         }
     }
@@ -560,6 +570,12 @@ impl Backend for NativeBackend<'_> {
         }
         if self.provider == ProviderId::Brew {
             return brew_plan(self.runner, install, remove);
+        }
+        if self.provider == ProviderId::Apk {
+            return crate::apk::plan(self.runner, install, remove);
+        }
+        if self.provider == ProviderId::Portage {
+            return crate::portage::plan(self.runner, install, remove);
         }
         if self.provider != ProviderId::Pacman {
             return Err(Error::Unsupported(

@@ -8,6 +8,8 @@ impl fmt::Display for ProviderId {
             Self::Dnf => "dnf",
             Self::Flatpak => "flatpak",
             Self::Brew => "brew",
+            Self::Apk => "apk",
+            Self::Portage => "portage",
             Self::Script => "script",
         })
     }
@@ -21,6 +23,8 @@ impl FromStr for ProviderId {
             "dnf" => Ok(Self::Dnf),
             "flatpak" => Ok(Self::Flatpak),
             "brew" => Ok(Self::Brew),
+            "apk" => Ok(Self::Apk),
+            "portage" => Ok(Self::Portage),
             "script" => Ok(Self::Script),
             _ => Err(Error::InvalidInput("unknown provider".into())),
         }
@@ -75,6 +79,18 @@ pub fn known_scope(provider: ProviderId, arch: &str) -> bool {
             "noarch", "x86_64", "aarch64", "i686", "ppc64le", "s390x", "riscv64", "armv7hl",
         ],
         ProviderId::Brew => &["formula", "cask"],
+        ProviderId::Apk => &[
+            "noarch",
+            "x86_64",
+            "x86",
+            "aarch64",
+            "armhf",
+            "armv7",
+            "ppc64le",
+            "s390x",
+            "riscv64",
+            "loongarch64",
+        ],
         _ => &[],
     };
     known.contains(&arch)
@@ -109,6 +125,17 @@ pub fn parse_name(provider: ProviderId, input: &str) -> Result<PackageId, Error>
             matches!(fields.len(), 1 | 3)
                 && fields.iter().all(|s| token(s, b"@._+-"))
                 && matches!(scope, Some("formula" | "cask"))
+        }
+        // apk names and architectures (`strace:x86_64`).
+        ProviderId::Apk => token(name, b"._+-") && scope.is_none_or(|s| token(s, b"_")),
+        // A category and a package (`dev-debug/strace`), and the slot as the
+        // scope (`dev-lang/python:3.12`); never a version or a repository.
+        ProviderId::Portage => {
+            let fields: Vec<_> = name.split('/').collect();
+            fields.len() == 2
+                && token(fields[0], b"+_.-")
+                && token(fields[1], b"+_-")
+                && scope.is_none_or(|s| token(s, b"+_.-"))
         }
         _ => false,
     };

@@ -30,7 +30,7 @@ Commands:
 
 Options:
       --json                   Print versioned JSON results (export and completions emit native text)
-      --sudo                   Use sudo only for confirmed APT/Pacman/DNF transactions and cleanup; previews stay unprivileged
+      --sudo                   Use sudo only for confirmed APT/Pacman/DNF/apk/Portage transactions and cleanup; previews stay unprivileged
       --state-dir <STATE_DIR>  Dedicated private transaction directory; inspection never creates it
       --profile <PROFILE>      Select a manifest profile; repeat to compose several profiles
   -h, --help                   Print help
