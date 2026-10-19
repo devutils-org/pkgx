@@ -220,3 +220,11 @@ The delegate receives a three-second relay grace period; synchronous reaping is
 bounded to 200 ms with an explicit failure/background reaper if a child does not
 exit. This does not establish that all privileged descendants stop on cancellation.
 The existing unreaped-leader/inherited-pipe regression still passes.
+
+## Distroproof installed-release matrix — 2026-10-19
+
+See [Linux portability](distroproof.md) for the new VM matrix and its measured
+checkpoint. The archives are installed in each guest; both GNU/glibc 2.17 and
+static musl builds are checked, with the GNU build explicitly inapplicable on
+musl-only Alpine. This complements the rootless tests above with each distro's
+own kernel, envprobe cross-checks and guest-native transaction checks.

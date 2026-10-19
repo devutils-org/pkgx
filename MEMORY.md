@@ -1,6 +1,6 @@
 # Mémoire du projet xpac
 
-Point de reprise enregistré le 18 octobre 2026.
+Point de reprise enregistré le 19 octobre 2026.
 
 ## Objectif et préférences
 
@@ -30,9 +30,19 @@ CARGO_TARGET_DIR=/tmp/xpac-target cargo clippy --workspace --all-targets --locke
 CARGO_TARGET_DIR=/tmp/xpac-target cargo test --workspace --locked --offline -q
 CARGO_TARGET_DIR=/tmp/xpac-target cargo build --release --locked --offline --target x86_64-unknown-linux-musl -p xpac-cli
 python3 scripts/test_package.py
+python3 scripts/distroproof/test_check.py
 ```
 
 Dernier checkpoint : 184 tests Rust + 2 tests Python, Clippy sans avertissement.
+
+## Portabilité Distroproof — 19/10/2026
+
+- `distroproof.toml` : 16 images Linux x86_64 + variantes Debian root/Fedora lockdown ; **18/18** réussies, 35 combinaisons archive/VM applicables, 749 contrôles. GNU non applicable sur Alpine musl, qui passe avec l'archive statique.
+- `distroproof-transactions.toml` : **10/10** VM, 440 contrôles d'inspection puis 17 scripts de transactions APT/Pacman/DNF5 ; aucun gestionnaire natif de l'hôte modifié.
+- APT abaissé de 2.6 à **1.6**, avec inventaires natifs et transactions réelles mesurés (Ubuntu 18.04 à 24.04, Debian 10 à 12). Consultation Debian 13/sid et Rocky DNF4 ; APK/Portage non implémentés.
+- Archives GNU **glibc 2.17** (`cargo-zigbuild`/Zig 0.16) et musl statique via `sh scripts/distroproof/build.sh` ; contrôles ELF ; artefacts Linux GNU CI alignés sur ce plancher.
+- `scripts/distroproof/check.py` juge les cellules, empreintes des binaires, couverture et faits envprobe. Tests négatifs `test_check.py`. Workflow manuel `.github/workflows/distroproof.yml` préparé, pas exécuté sur GitHub.
+- Rapport : `docs/distroproof.md`. Données locales : `dist/matrix/inspection.json`, `dist/matrix/transactions-final.json`, cellules jugées dans `dist/matrix/*-cells/`. La matrice ne couvre pas aarch64/macOS/Flatpak/Homebrew/TUI interactif.
 
 ## Travail restant
 

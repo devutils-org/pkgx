@@ -1,9 +1,9 @@
 # Backend capabilities and identity
 
-Implementation and fixture evidence are distinct from native certification. No
-native platform CI job has run in the local environment yet. CLI adapter creation
-requires a recognizable native version at or above these implementation targets:
-APT 2.6, Pacman 6.0, DNF 4.0 (including DNF5 for RPM consultation), Flatpak 1.14,
+Implementation, local native validation and hosted CI evidence are distinct.
+The [Distroproof matrix](distroproof.md) records the measured Linux coverage.
+CLI adapter creation requires a recognizable native version at or above these implementation targets:
+APT 1.6, Pacman 6.0, DNF 4.0 (including DNF5 for RPM consultation), Flatpak 1.14,
 Homebrew 4.0. Older or unrecognized versions are refused. These are policy targets,
 not claims that every newer release has been tested. Provider diagnostics expose
 the parsed version, minimum-target check and `certified: false`.
@@ -47,8 +47,9 @@ Homebrew queries disable automatic updates, analytics and install cleanup. No
 provider refreshes repositories during inspection. No adapter edits native databases.
 
 Pacman `--print` lists targets/dependencies, not the complete transaction including
-replacements, conflicts and hooks. Its plans are always uncertain and cannot be
-executed by xpac. A missing capability returns an explicit unsupported error;
+replacements, conflicts and hooks. Its plans remain uncertain; the experimental
+confirmed executor revalidates the preview, pins the repository and verifies
+installed versions afterwards (ADR 007). A missing capability returns an explicit unsupported error;
 providers are never substituted.
 
 Primary native references:

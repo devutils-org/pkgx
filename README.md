@@ -20,6 +20,10 @@ Native execution and managed files are experimental. Changes require confirmatio
 partial failures do not imply rollback. See [support](docs/support.md) and
 [recovery](docs/recovery.md).
 
+Linux x86_64 portability is checked with installed GNU/musl releases across
+16 distro images plus root and lockdown variants. See the
+[measured matrix and limits](docs/distroproof.md).
+
 ## Install
 
 From a source checkout with Rust stable:
@@ -49,7 +53,7 @@ Execution support differs by provider: see the [backend matrix](docs/backends.md
 ## Documentation
 
 [CLI and behavior reference](REFERENCE.md) · [Manifests](docs/manifest.md) ·
-[Recipes](docs/recipes.md) · [Validation](docs/validation.md) · [Roadmap](xpac.md)
+[Linux portability](docs/distroproof.md) · [Recipes](docs/recipes.md) · [Validation](docs/validation.md) · [Roadmap](xpac.md)
 
 ## Development
 

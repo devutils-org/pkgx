@@ -1,0 +1,56 @@
+# Install the real GNU (glibc 2.17) and static musl release archives in each VM.
+# sh scripts/distroproof/build.sh
+# distroproof up -f distroproof-transactions.toml --no-tui --jobs 4 --json dist/matrix/transactions.json
+# python3 scripts/distroproof/check.py dist/matrix/transactions.json --matrix distroproof-transactions.toml
+[defaults]
+memory = "1G"
+cpus = 2
+timeout = "10m"
+
+[[target]]
+name = "transactions-debian-12"
+image = "debian-12"
+
+[[target]]
+name = "transactions-ubuntu-24.04"
+image = "ubuntu-24.04"
+
+[[target]]
+name = "transactions-arch"
+image = "arch"
+
+[[target]]
+name = "transactions-fedora-previous"
+image = "fedora-previous"
+
+[[target]]
+name = "transactions-fedora-latest"
+image = "fedora-latest"
+
+[[target]]
+name = "transactions-debian-10"
+image = "debian-10"
+
+[[target]]
+name = "transactions-debian-11"
+image = "debian-11"
+
+[[target]]
+name = "transactions-ubuntu-18.04"
+image = "ubuntu-18.04"
+
+[[target]]
+name = "transactions-ubuntu-20.04"
+image = "ubuntu-20.04"
+
+[[target]]
+name = "transactions-ubuntu-22.04"
+image = "ubuntu-22.04"
+
+[run]
+setup = "sh scripts/distroproof/setup.sh"
+command = "sh scripts/distroproof/sweep.sh"
+as_user = "root"
+collect = ["cell.json"]
+exclude = ["*"]
+include = ["dist/distroproof", "scripts/distroproof", "tests/containers", "tests/sandbox/files-checks.sh"]

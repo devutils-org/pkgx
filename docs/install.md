@@ -25,6 +25,16 @@ Add `$HOME/.local/bin` to your shell's PATH. Installing the CLI itself does not
 require root. Native package transactions need native privileges; --sudo opts in
 to delegating only a confirmed APT transaction. There is no implicit elevation. No bootstrap script is downloaded or executed.
 
+## Portable Linux builds
+
+`sh scripts/distroproof/build.sh` builds and packages two x86_64 archives:
+GNU linked against glibc 2.17 (Zig/cargo-zigbuild), and static musl. It checks
+the GNU symbol floor and rejects a musl build needing a loader/shared library.
+The [Distroproof guide](distroproof.md) lists the prerequisites, guest tests and
+measured coverage. A normal `cargo build` uses the host's libc and does not
+establish that portability floor. Both the matrix and Linux GNU artifact CI use
+the portable build path; archives remain unpublished review artifacts.
+
 ## Reviewable archives
 
 The packaging tool requires Python 3.11 or newer and uses only its standard

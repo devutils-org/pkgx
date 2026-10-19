@@ -15,7 +15,7 @@ pub struct Compatibility {
 }
 fn minimum(provider: ProviderId) -> NativeVersion {
     let (major, minor) = match provider {
-        ProviderId::Apt => (2, 6),
+        ProviderId::Apt => (1, 6),
         ProviderId::Pacman => (6, 0),
         ProviderId::Dnf => (4, 0),
         ProviderId::Flatpak => (1, 14),
@@ -116,7 +116,9 @@ mod tests {
             4
         );
         assert!(require_target(ProviderId::Apt, "apt 2.6.1ubuntu1 (amd64)").is_ok());
-        assert!(require_target(ProviderId::Apt, "apt 2.4.0 (amd64)").is_err());
+        assert!(require_target(ProviderId::Apt, "apt 2.4.0 (amd64)").is_ok());
+        assert!(require_target(ProviderId::Apt, "apt 1.6.17 (amd64)").is_ok());
+        assert!(require_target(ProviderId::Apt, "apt 1.4.11 (amd64)").is_err());
         assert!(require_target(ProviderId::Brew, "unrecognized wrapper output").is_err());
         assert!(!compatibility(ProviderId::Brew, "Homebrew 4.6.0").certified);
     }

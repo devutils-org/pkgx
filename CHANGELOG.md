@@ -2,6 +2,13 @@
 
 ## 0.1.0 — unreleased
 
+- Add an installed-release Distroproof matrix on 16 Linux images plus root and
+  lockdown variants, with envprobe cross-checks and independent native inventories.
+- Build GNU Linux archives against glibc 2.17 and verify the symbol floor; also
+  verify the static musl archive. Add a manual portability workflow and a cell judge.
+- Lower the APT implementation target from 2.6 to 1.6 after native inspection and
+  transaction checks in disposable distro VMs (docs/distroproof.md).
+
 - Run the managed-file checks in CI on Linux (bubblewrap) and macOS; the full CI
   matrix and the release-artifact workflow passed.
 - Add experimental `files` manifest declarations for home-relative configuration

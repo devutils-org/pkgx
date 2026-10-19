@@ -1,0 +1,61 @@
+name: Linux portability with distroproof
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: /tmp/xpac-target
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: devutils-org/distroproof
+          ref: 412d873e6806c5050c39feb632ecf8ee6516ab22
+          path: .distroproof/tool
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: VM and portable build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf binutils
+          python3 -m pip install --user ziglang==0.16.0
+          cargo install cargo-zigbuild --version 0.23.4 --locked
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/sh\nexec python3 -m ziglang "$@"\n' > "$HOME/.local/bin/zig"
+          chmod +x "$HOME/.local/bin/zig"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Build the two xpac archives and the VM runner
+        run: |
+          cargo fetch --locked
+          sh scripts/distroproof/build.sh
+          cargo build --manifest-path .distroproof/tool/Cargo.toml --release --locked --target x86_64-unknown-linux-musl -p distroproof -p envprobe
+      - name: Inspect installed releases on each distro kernel
+        run: |
+          mkdir -p dist/matrix
+          /tmp/xpac-target/x86_64-unknown-linux-musl/release/distroproof check
+          /tmp/xpac-target/x86_64-unknown-linux-musl/release/distroproof up --no-tui --jobs 2 --json dist/matrix/inspection.json --junit dist/matrix/inspection.xml
+      - name: Judge inspection cells
+        if: always()
+        run: python3 scripts/distroproof/check.py dist/matrix/inspection.json --output dist/matrix/inspection-cells
+      - name: Native transactions inside disposable guests
+        run: |
+          /tmp/xpac-target/x86_64-unknown-linux-musl/release/distroproof up -f distroproof-transactions.toml --no-tui --jobs 2 --json dist/matrix/transactions.json --junit dist/matrix/transactions.xml
+      - name: Judge transaction cells
+        if: always()
+        run: python3 scripts/distroproof/check.py dist/matrix/transactions.json --matrix distroproof-transactions.toml --output dist/matrix/transaction-cells
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xpac-linux-portability
+          path: |
+            dist/matrix/
+            dist/distroproof/builds.json
+            .distroproof/collect/

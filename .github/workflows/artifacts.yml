@@ -23,6 +23,15 @@ jobs:
           python-version: '3.12'
       - run: cargo test --workspace --locked
       - run: python3 scripts/test_package.py
+      - name: Link the Linux GNU archive against glibc 2.17
+        if: runner.os == 'Linux' && matrix.flavor == 'host'
+        run: |
+          python3 -m pip install --user ziglang==0.16.0
+          cargo install cargo-zigbuild --version 0.23.4 --locked
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/sh\nexec python3 -m ziglang "$@"\n' > "$HOME/.local/bin/zig"
+          chmod +x "$HOME/.local/bin/zig"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Build and package the selected target
         shell: bash
         env:
@@ -36,7 +45,12 @@ jobs:
             build_target=x86_64-unknown-linux-musl
             rustup target add "$build_target"
           fi
-          cargo build --release --locked --target "$build_target" -p xpac-cli
+          if [ "$RUNNER_OS" = Linux ] && [ "$BUILD_FLAVOR" = host ]; then
+            cargo zigbuild --release --locked --target "$build_target.2.17" -p xpac-cli
+            python3 -c 'import runpy, pathlib; runpy.run_path("scripts/distroproof/package.py")["glibc_floor"](pathlib.Path("target/x86_64-unknown-linux-gnu/release/xpac"))'
+          else
+            cargo build --release --locked --target "$build_target" -p xpac-cli
+          fi
           rustc -vV > /tmp/xpac-rustc.txt
           python3 scripts/package.py \
             --binary "target/$build_target/release/xpac" \
