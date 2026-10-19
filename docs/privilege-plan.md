@@ -6,7 +6,7 @@ password), then repeat native plan/inventory validation. The eventual transactio
 uses noninteractive sudo so credential expiry cannot introduce another prompt.
 
 Use fixed /usr/bin/sudo and /usr/bin/apt-get paths; refuse a different apt-get on
-PATH or native database/config environment overrides. Do not elevate pkgx itself,
+PATH or native database/config environment overrides. Do not elevate xpac itself,
 its journal, manifest parsing, registry writes, or arbitrary CommandSpec programs.
 TUI authentication must temporarily restore the normal terminal before prompting.
 

@@ -1,15 +1,15 @@
 # Local validation checkpoint — 2026-10-18
 
 Environment: Linux x86_64 (Arch), rustc 1.99.1 (58cf8f9c3 2026-10-13), Python 3.14.
-Cargo output uses /tmp/pkgx-target. Earlier checkpoints ran on Linux aarch64.
+Cargo output uses /tmp/xpac-target. Earlier checkpoints ran on Linux aarch64.
 
 ## Automated checks
 
 ```sh
 cargo fmt --check
-CARGO_TARGET_DIR=/tmp/pkgx-target cargo clippy --workspace --all-targets --locked --offline -- -D warnings
-CARGO_TARGET_DIR=/tmp/pkgx-target cargo test --workspace --locked --offline -q
-CARGO_TARGET_DIR=/tmp/pkgx-target cargo build --release --locked --offline -p pkgx-cli
+CARGO_TARGET_DIR=/tmp/xpac-target cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+CARGO_TARGET_DIR=/tmp/xpac-target cargo test --workspace --locked --offline -q
+CARGO_TARGET_DIR=/tmp/xpac-target cargo build --release --locked --offline -p xpac-cli
 python3 scripts/test_package.py
 ```
 
@@ -39,7 +39,7 @@ Fish is unavailable, so its completion definition has not been parsed by Fish.
 ## Disposable Arch root — 2026-10-18
 
 Environment: Linux x86_64 Arch host, Pacman 7.1.0 / libalpm 16.0.1, bubblewrap 0.13.1.
-`tests/sandbox/arch-userns.sh WORKDIR target/debug/pkgx` bootstrapped a fresh Arch
+`tests/sandbox/arch-userns.sh WORKDIR target/debug/xpac` bootstrapped a fresh Arch
 root (108 packages, signatures required, public keyring copied) with every pacman
 path redirected into WORKDIR, then ran `tests/containers/pacman.sh` and
 `tests/containers/pacman-transactions.sh` with that root bound as `/` inside an
@@ -49,9 +49,9 @@ unprivileged user namespace. Both passed (exit 0):
 - unconfirmed noninteractive apply refused with no change;
 - manifest install of `sl` with explicit reason, verified versions and journal;
 - repeated apply returned an empty operation list;
-- IgnorePkg refusal by pkgx policy;
+- IgnorePkg refusal by xpac policy;
 - HoldPkg and critical-package removal previews refused (in this run pacman's own
-  noninteractive HoldPkg prompt and dependency checks refused first; the pkgx
+  noninteractive HoldPkg prompt and dependency checks refused first; the xpac
   policy path is covered by injected-runner tests);
 - a saved removal plan invalidated by an inventory change was refused;
 - a fresh saved removal plan removed `sl` without cascading into `ncurses`;
@@ -74,7 +74,7 @@ unrelated to the checked transactions. --sudo was not exercised.
 `tests/sandbox/debian-userns.sh` and `tests/sandbox/fedora-userns.sh` build a
 disposable Arch tool root (debootstrap + Debian/Ubuntu keyrings, or dnf5), then a
 target root on a tmpfs inside a user namespace mapping the subordinate UID range,
-with a static musl pkgx. Host package databases were never targets.
+with a static musl xpac. Host package databases were never targets.
 
 - Debian bookworm (APT 2.6.1) and Ubuntu 24.04 noble: `inspection.sh`,
   `transactions.sh` and `privilege.sh` passed — inspection, export/diff/plan,
@@ -121,14 +121,14 @@ the journal recorded the results. Two defects were found and fixed on the way:
 Homebrew 7 receipts lack `installed_as_dependency` (reasons were `unknown`), and
 `brew uninstall` autoremoves dependencies unless HOMEBREW_NO_AUTOREMOVE is set.
 
-The same check now refuses to run unless PKGX_DISPOSABLE=1 and uses a preinstalled
+The same check now refuses to run unless XPAC_DISPOSABLE=1 and uses a preinstalled
 `brew` when present, so the `macos-smoke` CI job runs it on the discarded hosted
 runner. It was re-run in the Linux root after that change (passed) and then
 passed on the hosted macOS runner (GitHub Actions run 39143547380).
 
 ## Script recipe sandbox — 2026-10-18
 
-`tests/sandbox/recipe-userns.sh target/debug/pkgx` runs `tests/sandbox/recipe-checks.sh`
+`tests/sandbox/recipe-userns.sh target/debug/xpac` runs `tests/sandbox/recipe-checks.sh`
 in bubblewrap with the host bound read-only, private tmpfs /tmp and HOME, and a
 loopback-only network namespace. It serves its own fixture script over HTTPS
 (self-signed CA via CURL_CA_BUNDLE) and passed: tampered digest refused before
@@ -142,7 +142,7 @@ classified `observed`, and the log survived uninstall.
 
 ## Managed configuration file sandbox — 2026-10-18
 
-`tests/sandbox/files-userns.sh target/debug/pkgx` runs `tests/sandbox/files-checks.sh`
+`tests/sandbox/files-userns.sh target/debug/xpac` runs `tests/sandbox/files-checks.sh`
 in bubblewrap with the host bound read-only, private tmpfs /tmp (HOME and state
 directory) and no network. It passed: an unmanaged `~/.bashrc` blocked `apply` with
 no file or state created; adoption without --yes was refused, then stored a private
@@ -161,7 +161,7 @@ inventory, temporary HOME) showed `unmanaged_conflict ~/.bashrc` and `missing
 
 ## Native and terminal evidence
 
-Pacman 7.1.0 / libalpm 16.0.1 is available in this environment. The actual pkgx binary
+Pacman 7.1.0 / libalpm 16.0.1 is available in this environment. The actual xpac binary
 successfully read its 301-package inventory and queried installed dependency
 expressions and native installation provenance for bash. These operations were
 read-only. This is consultation evidence, not Arch transaction certification.

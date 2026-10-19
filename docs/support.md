@@ -21,9 +21,9 @@ preview checks. Pacman transactions ran only inside a disposable root created by
 tests/sandbox/arch-userns.sh in an unprivileged user namespace. No native host package transaction, downloaded script or cleanup operation
 has been run on the host. Configuring CI does not count as a successful CI run.
 
-Build locally using Rust stable: `cargo build --release --locked -p pkgx-cli`.
+Build locally using Rust stable: `cargo build --release --locked -p xpac-cli`.
 Run fmt, workspace clippy with -D warnings and workspace tests before changes are
-considered validated. Cargo.lock is checked in. `cargo run -p pkgx-cli -- completions
+considered validated. Cargo.lock is checked in. `cargo run -p xpac-cli -- completions
 bash` (or zsh/fish) prints completion definitions; installation is explicit.
 
 The manually triggered artifacts workflow builds/tests Linux and macOS binaries,

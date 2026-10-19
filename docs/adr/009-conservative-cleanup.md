@@ -3,7 +3,7 @@
 Status: implemented experimentally; injected-runner regressions and the disposable
 Arch root (docs/validation.md). APT cleanup has injected evidence only.
 
-`pkgx audit` (and `clean --dry-run`) separate findings into three classes:
+`xpac audit` (and `clean --dry-run`) separate findings into three classes:
 
 - `safe_native_cleanup`: native package caches. Only the directories the package
   manager reports are measured (`apt-config shell ARCHIVES Dir::Cache::archives/d`,

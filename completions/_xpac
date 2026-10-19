@@ -1,0 +1,38 @@
+#compdef xpac
+local -a commands
+commands=(
+  'demo:Browse synthetic packages without native tools'
+  'manage:Grant or forget strict APT management' 'managed:List management grants'
+  'providers:Detect native package managers' 'doctor:Inspect provider and journal health'
+  'list:List installed packages' 'search:Search native package metadata'
+  'info:Inspect package metadata' 'why:Inspect native provenance' 'deps:Inspect installed dependency expressions'
+  'install:Preview or confirm APT installation' 'remove:Preview or confirm APT removal'
+  'export:Export an additive manifest' 'diff:Inspect manifest drift'
+  'plan:Inspect native operations' 'apply:Reconcile an additive manifest'
+  'audit:Inspect native orphan candidates' 'clean:Preview cleanup findings'
+  'history:Read transaction records' 'file:Adopt, list, forget or remove managed files'
+  'recipe:Check, verify, install or track script recipes'
+  'tui:Open the read-only package browser' 'completions:Print shell completions'
+)
+_arguments -C \
+  '--forget[Forget an explicit package management grant]' \
+  '--snapshot[Print synthetic demo inventory]' \
+  '--sudo[Delegate confirmed APT execution only]' \
+  '--json[Print structured output]' \
+  '--provider[Select a provider]:provider:(apt pacman dnf flatpak brew)' \
+  '*--profile[Select a manifest profile]:profile:' \
+  '--state-dir[Private journal directory]:directory:_directories' \
+  '(-f --file)'{-f,--file}'[Manifest or recipe file]:file:_files' \
+  '(-o --output)'{-o,--output}'[Export destination]:file:_files' \
+  '--allow-apply[Enable confirmed experimental TUI APT operations]' \
+  '--installed[Search installed inventory only]' \
+  '--limit[History page size]:count:' \
+  '--offset[History page offset]:offset:' \
+  '--save[Save a package preview]:file:_files' \
+  '--expires-in[Plan lifetime, 1–3600 seconds]:seconds:(300 600 1800 3600)' \
+  '--plan[Saved plan to apply]:file:_files' \
+  '--dry-run[Preview without native changes]' '--yes[Confirm native transaction]' \
+  '1:command:->commands' '*:argument:_files'
+case "$state" in
+  commands) _describe 'command' commands ;;
+esac

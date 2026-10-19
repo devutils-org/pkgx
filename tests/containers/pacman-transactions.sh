@@ -10,61 +10,61 @@ version = 1
 [packages.pacman]
 install = ['sl']
 MANIFEST
-pkgx apply -f /tmp/sl.toml --dry-run --json
-if printf 'no\n' | pkgx apply -f /tmp/sl.toml; then
+xpac apply -f /tmp/sl.toml --dry-run --json
+if printf 'no\n' | xpac apply -f /tmp/sl.toml; then
     fail 'unconfirmed apply unexpectedly succeeded'
 fi
 ! installed sl || fail 'unconfirmed apply changed the system'
-pkgx apply -f /tmp/sl.toml --yes --state-dir /tmp/pkgx-records --json
+xpac apply -f /tmp/sl.toml --yes --state-dir /tmp/xpac-records --json
 installed sl
 [ "$(pacman -Qqe sl)" = sl ] || fail 'requested package is not marked explicit'
-pkgx apply -f /tmp/sl.toml --yes --json > /tmp/second-apply.json
+xpac apply -f /tmp/sl.toml --yes --json > /tmp/second-apply.json
 # Repeated application is a verified no-op.
 grep -q '"operations":\[\]' /tmp/second-apply.json
 # Native protections: HoldPkg, the built-in critical set and IgnorePkg.
 cp /etc/pacman.conf /tmp/pacman.conf.orig
 sed -i 's/^HoldPkg.*/& sl/' /etc/pacman.conf
-if pkgx remove pacman:sl --dry-run; then
+if xpac remove pacman:sl --dry-run; then
     fail 'held-package removal preview unexpectedly succeeded'
 fi
 cp /tmp/pacman.conf.orig /etc/pacman.conf
-if pkgx remove pacman:filesystem --dry-run; then
+if xpac remove pacman:filesystem --dry-run; then
     fail 'critical-package removal preview unexpectedly succeeded'
 fi
 sed -i 's/^HoldPkg.*/&\nIgnorePkg = figlet/' /etc/pacman.conf
-if pkgx install pacman:figlet --yes; then
+if xpac install pacman:figlet --yes; then
     fail 'ignored package installation unexpectedly succeeded'
 fi
 cp /tmp/pacman.conf.orig /etc/pacman.conf
 ! installed figlet || fail 'ignored package was installed'
 # A reviewed removal plan becomes stale when the inventory changes.
-pkgx plan pacman:sl --remove --save /tmp/stale.json --json
-pkgx install pacman:figlet --yes --json
+xpac plan pacman:sl --remove --save /tmp/stale.json --json
+xpac install pacman:figlet --yes --json
 installed figlet
-if pkgx apply --plan /tmp/stale.json --yes --json; then
+if xpac apply --plan /tmp/stale.json --yes --json; then
     fail 'stale saved plan unexpectedly executed'
 fi
 installed sl
-pkgx plan pacman:sl --remove --save /tmp/review.json --expires-in 300 --json
-pkgx apply --plan /tmp/review.json --yes --state-dir /tmp/pkgx-records --json
+xpac plan pacman:sl --remove --save /tmp/review.json --expires-in 300 --json
+xpac apply --plan /tmp/review.json --yes --state-dir /tmp/xpac-records --json
 ! installed sl || fail 'reviewed removal left the package installed'
 installed ncurses || fail 'removal cascaded into a dependency'
-pkgx remove pacman:figlet --yes --json
+xpac remove pacman:figlet --yes --json
 # Suggested cleanup: a dependency-marked leaf is removed only through review.
 pacman -S --noconfirm --asdeps figlet
-pkgx audit --provider pacman --json | grep -q '"category":"suggested_cleanup"'
-pkgx clean --orphans --provider pacman --dry-run --json | grep -q figlet
-if printf 'no\n' | pkgx clean --orphans --provider pacman; then
+xpac audit --provider pacman --json | grep -q '"category":"suggested_cleanup"'
+xpac clean --orphans --provider pacman --dry-run --json | grep -q figlet
+if printf 'no\n' | xpac clean --orphans --provider pacman; then
     fail 'unconfirmed orphan cleanup unexpectedly ran'
 fi
 installed figlet
-pkgx clean --orphans --provider pacman --yes --state-dir /tmp/pkgx-records --json
+xpac clean --orphans --provider pacman --yes --state-dir /tmp/xpac-records --json
 ! installed figlet || fail 'orphan cleanup left the package'
 installed bash
 # Safe native cleanup through pacman -Sc only.
-pkgx clean --cache --provider pacman --dry-run --json
-pkgx clean --cache --provider pacman --yes --state-dir /tmp/pkgx-records --json > /tmp/cache.json
+xpac clean --cache --provider pacman --dry-run --json
+xpac clean --cache --provider pacman --yes --state-dir /tmp/xpac-records --json > /tmp/cache.json
 grep -q '"success":true' /tmp/cache.json
-pkgx history --state-dir /tmp/pkgx-records --json > /tmp/history.json
+xpac history --state-dir /tmp/xpac-records --json > /tmp/history.json
 [ "$(grep -o '"success":true' /tmp/history.json | wc -l)" -ge 4 ] || fail 'journal is missing results'
-pkgx doctor --state-dir /tmp/pkgx-records --json
+xpac doctor --state-dir /tmp/xpac-records --json

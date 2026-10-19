@@ -7,7 +7,7 @@ import tarfile
 import tempfile
 import unittest
 
-spec = importlib.util.spec_from_file_location("pkgx_package", Path(__file__).with_name("package.py"))
+spec = importlib.util.spec_from_file_location("xpac_package", Path(__file__).with_name("package.py"))
 packaging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(packaging)
 
@@ -26,7 +26,7 @@ class ArchiveTests(unittest.TestCase):
             with tarfile.open(fileobj=io.BytesIO(first.read_bytes())) as archive:
                 files = archive.getmembers()
                 self.assertTrue(all(f.uid == f.gid == 0 and f.mtime == 123 for f in files))
-                executable = next(f for f in files if f.name.endswith("/pkgx"))
+                executable = next(f for f in files if f.name.endswith("/xpac"))
                 self.assertEqual(executable.mode, 0o755)
                 self.assertEqual(archive.extractfile(executable).read(), binary.read_bytes())
                 manifest = json.load(archive.extractfile(next(f for f in files if f.name.endswith("/BUILD.json"))))
@@ -56,7 +56,7 @@ class ArchiveTests(unittest.TestCase):
                     packaging.package(binary, target, root / "other", 0)
             with self.assertRaises(ValueError):
                 packaging.package(binary, "test-target", root / "other", -1)
-            self.assertFalse(list((root / "out").glob(".pkgx-*")))
+            self.assertFalse(list((root / "out").glob(".xpac-*")))
 
 
 if __name__ == "__main__":

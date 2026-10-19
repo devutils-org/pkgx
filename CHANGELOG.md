@@ -9,10 +9,10 @@
   `diff` states.
 - Plan and write declared files with `plan -f`/`apply -f` (unified-diff previews,
   separate confirmation, atomic no-follow writes, receipts) and add
-  `pkgx file adopt|list|forget` with private backups (ADR 013).
-- Add `pkgx file remove` for unchanged managed files (inode-checked, backed up) and
+  `xpac file adopt|list|forget` with private backups (ADR 013).
+- Add `xpac file remove` for unchanged managed files (inode-checked, backed up) and
   a bubblewrap sandbox for managed files (tests/sandbox/files-userns.sh).
-- `pkgx file list` reports intact/drifted/missing/unsupported receipts; the TUI
+- `xpac file list` reports intact/drifted/missing/unsupported receipts; the TUI
   manifest review shows declared file states read-only.
 - Add experimental confirmed Pacman execution: --needed previews, HoldPkg/IgnorePkg
   and critical-package policy, repository pinning, version verification, journals,

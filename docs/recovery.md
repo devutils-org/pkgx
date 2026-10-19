@@ -5,25 +5,25 @@ sufficient native privileges and explicit confirmation. --sudo explicitly
 delegates only the native APT transaction after authentication and revalidation.
 Inspect with --dry-run first. Never test real transactions on the workstation.
 
-After confirmation, pkgx repeats inventory and native simulation. A changed plan
+After confirmation, xpac repeats inventory and native simulation. A changed plan
 aborts. Requested install versions are pinned; native critical-package, held-package
 and downgrade protections remain enabled. Install-only reconciliation forbids native
 removals. APT's lock protects its transaction, not the preceding preview; this is not
 an atomic repository snapshot, and dependency versions may still race.
 
 Before invoking APT, the CLI persists intent to a private versioned JSON journal.
-Default: `$XDG_STATE_HOME/pkgx/transactions`, or `$HOME/.local/state/pkgx/transactions`.
+Default: `$XDG_STATE_HOME/xpac/transactions`, or `$HOME/.local/state/xpac/transactions`.
 An explicit --state-dir selects the journal directory itself. New directories are
 created privately; existing directories must already be private and owned by the
-current user. pkgx does not chmod shared directories. Entries use restricted files,
+current user. xpac does not chmod shared directories. Entries use restricted files,
 staged writes, fsync and atomic replacement. Journal failure before execution aborts
 the transaction. Failure to save the final result is reported, never silently ignored.
 
-`pkgx history --json` reads the latest 20 records without creating state. Use
+`xpac history --json` reads the latest 20 records without creating state. Use
 --limit (1–1000) and --offset to page older records. `doctor` computes counts one
-record at a time rather than retaining every old plan in memory. `pkgx doctor --json`
+record at a time rather than retaining every old plan in memory. `xpac doctor --json`
 reports pending records and journal-read errors. A record with no result is running,
-interrupted or unknown; pkgx never converts it to success on startup. No automatic
+interrupted or unknown; xpac never converts it to success on startup. No automatic
 rollback, repair or transaction replay exists. Entries contain native package details
 but never command arguments, environment credentials or raw backend stderr.
 
@@ -69,16 +69,16 @@ automatic retry or an additional password prompt during the transaction.
 ## Managed strict scope
 
 Explicit grants are stored in `<state-dir>/managed/registry.json`, separately from
-transaction records. `pkgx managed` reads them; `pkgx manage ID --forget` revokes a
+transaction records. `xpac managed` reads them; `xpac manage ID --forget` revokes a
 grant without changing native packages. A recorded grant may outlive a package.
 Changing the package's native version or install reason invalidates its removal
 authority until a fresh grant is reviewed. State is never inferred from exports.
 
 The `managed/lock` file serializes registry writers and strict execution. It is
 removed on normal completion, including reported failures. A crash can leave it
-behind: first inspect journal entries and active pkgx/native-manager processes.
+behind: first inspect journal entries and active xpac/native-manager processes.
 Only after confirming no writer/transaction is active should the user manually
-remove that exact registry lock file. pkgx never guesses from a PID or automatically
+remove that exact registry lock file. xpac never guesses from a PID or automatically
 clears an interrupted lock. Do not delete the registry or native lock files as a
 shortcut. Review a new native plan after any interrupted transaction.
 
@@ -87,20 +87,20 @@ no APT transaction. A later sudo -n failure is recorded like other execution
 failures; inspect the result and current native state before retrying. The registry
 and journal remain owned by the invoking user. In automation, obtain sudo credentials
 through the system's own mechanism or configure the intended sudoers policy outside
-pkgx; passwords are not passed through pkgx flags, JSON, logs or stdin.
+xpac; passwords are not passed through xpac flags, JSON, logs or stdin.
 
 For delegated transactions, cancellation first asks sudo to forward termination.
 An unprivileged caller cannot guarantee that privileged/detached descendants have
 stopped. If cleanup reports a process may still be running, inspect native processes
-and locks before retrying. pkgx does not block forever waiting for an unkillable
+and locks before retrying. xpac does not block forever waiting for an unkillable
 child, and retains a background reaper while the CLI/TUI process remains alive.
 
 ## Managed configuration files
 
 File writes (ADR 013) are not journaled; `<state-dir>/files/registry.json` is their
-record. After an interruption, run `pkgx diff -f`: an updated file that was renamed
+record. After an interruption, run `xpac diff -f`: an updated file that was renamed
 before its receipt shows as in sync; a newly created one shows as an unmanaged
-conflict and must be adopted to continue. A leftover `.pkgx-*` temporary file next to
+conflict and must be adopted to continue. A leftover `.xpac-*` temporary file next to
 a target can be deleted manually. A stale `<state-dir>/files/lock` is never removed
-automatically; inspect that no pkgx process runs before deleting it. Adoption backups
+automatically; inspect that no xpac process runs before deleting it. Adoption backups
 under `<state-dir>/files/backups/<sha256>` are kept until you remove them.

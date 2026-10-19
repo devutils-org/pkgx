@@ -63,41 +63,41 @@ RECIPE
 recipe "$digest" > /tmp/demo.toml
 recipe "$(printf '%064d' 1)" > /tmp/tampered.toml
 state="--state-dir /tmp/state"
-pkgx recipe check -f /tmp/demo.toml --json
-pkgx recipe install -f /tmp/demo.toml --dry-run $state --json
-if pkgx recipe install -f /tmp/tampered.toml --yes $state; then
+xpac recipe check -f /tmp/demo.toml --json
+xpac recipe install -f /tmp/demo.toml --dry-run $state --json
+if xpac recipe install -f /tmp/tampered.toml --yes $state; then
     fail 'tampered artifact unexpectedly installed'
 fi
 [ ! -e "$HOME/.local/bin/demo-tool" ] || fail 'tampered install ran the script'
-if printf 'no\n' | pkgx recipe install -f /tmp/demo.toml $state; then
+if printf 'no\n' | xpac recipe install -f /tmp/demo.toml $state; then
     fail 'untrusted install unexpectedly ran'
 fi
 [ ! -e "$HOME/.local/bin/demo-tool" ] || fail 'unconfirmed install ran the script'
-pkgx recipe install -f /tmp/demo.toml --yes --observe $state --json > /tmp/install.json
+xpac recipe install -f /tmp/demo.toml --yes --observe $state --json > /tmp/install.json
 grep -q 'demo-tool.log' /tmp/install.json || fail 'undeclared effect not observed'
 [ "$("$HOME/.local/bin/dt")" = demo ] || fail 'installed tool does not run'
-pkgx recipe list $state --json | grep -q '"classification":"observed"'
-if pkgx recipe install -f /tmp/demo.toml --yes $state; then
+xpac recipe list $state --json | grep -q '"classification":"observed"'
+if xpac recipe install -f /tmp/demo.toml --yes $state; then
     fail 'duplicate install unexpectedly ran'
 fi
 cp "$HOME/.local/bin/demo-tool" /tmp/original
 printf 'user edit\n' >> "$HOME/.local/bin/demo-tool"
-if pkgx recipe uninstall demo-tool --yes $state; then
+if xpac recipe uninstall demo-tool --yes $state; then
     fail 'modified resource unexpectedly uninstalled'
 fi
 [ -e "$HOME/.local/bin/demo-tool" ] || fail 'refused uninstall removed a file'
 cp /tmp/original "$HOME/.local/bin/demo-tool"
 printf 'greeting = "edited"\n' > "$HOME/.config/demo-tool.toml"
-pkgx recipe uninstall demo-tool --dry-run $state --json
-pkgx recipe uninstall demo-tool --yes $state --json > /tmp/uninstall.json
+xpac recipe uninstall demo-tool --dry-run $state --json
+xpac recipe uninstall demo-tool --yes $state --json > /tmp/uninstall.json
 grep -q '"success":true' /tmp/uninstall.json
 [ ! -e "$HOME/.local/bin/demo-tool" ] && [ ! -L "$HOME/.local/bin/dt" ] || fail 'owned files remain'
 grep -q edited "$HOME/.config/demo-tool.toml" || fail 'configuration was not retained'
 [ -e "$HOME/.cache/demo-tool.log" ] || fail 'observed path was removed'
-[ "$(pkgx recipe list $state --json)" = '{"data":[],"schema_version":1}' ] || fail 'receipt remains'
+[ "$(xpac recipe list $state --json)" = '{"data":[],"schema_version":1}' ] || fail 'receipt remains'
 # A pre-existing user file can never be claimed by a recipe.
 mkdir -p "$HOME/.local/bin" && printf 'mine\n' > "$HOME/.local/bin/demo-tool"
-if pkgx recipe install -f /tmp/demo.toml --yes $state; then
+if xpac recipe install -f /tmp/demo.toml --yes $state; then
     fail 'pre-existing path unexpectedly claimed'
 fi
 [ "$(cat "$HOME/.local/bin/demo-tool")" = mine ] || fail 'user file changed'

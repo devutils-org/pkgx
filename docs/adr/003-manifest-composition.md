@@ -10,7 +10,7 @@ Unknown inactive layers still fail validation; nonmatching known platforms are
 reported as skipped. Inheritance cycles and unresolved profile names are errors.
 
 Names carry a provider and architecture/scope. Brew kind and Flatpak ref/kind/scope
-are mandatory to avoid collisions. A native mark does not prove pkgx ownership.
+are mandatory to avoid collisions. A native mark does not prove xpac ownership.
 Strict synchronization was initially refused. ADR 005 now defines explicit
 APT management grants and fail-closed native removal scope; platform acceptance
 remains pending.

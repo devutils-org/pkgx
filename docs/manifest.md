@@ -19,7 +19,7 @@ extends = ["base"]
 install = ["gdb"]
 ```
 
-Use `pkgx diff -f system.toml --profile dev` to activate a profile. Profiles are never
+Use `xpac diff -f system.toml --profile dev` to activate a profile. Profiles are never
 automatically activated. Resolution is an additive union of base packages, matching
 platform packages, then requested profiles with their ancestors first in the declared
 `extends` order. Requested profiles follow CLI order; each profile is included once.
@@ -85,18 +85,18 @@ An existing file is never overwritten until you adopt it; adoption keeps a priva
 backup under `<state-dir>/files/backups` and the next apply replaces it after review:
 
 ```sh
-pkgx file adopt ~/.tmux.conf --dry-run
-pkgx file adopt ~/.tmux.conf
-pkgx apply -f system.toml
-pkgx file list
-pkgx file forget ~/.tmux.conf   # drops the receipt, keeps the file
-pkgx file remove ~/.tmux.conf --dry-run
+xpac file adopt ~/.tmux.conf --dry-run
+xpac file adopt ~/.tmux.conf
+xpac apply -f system.toml
+xpac file list
+xpac file forget ~/.tmux.conf   # drops the receipt, keeps the file
+xpac file remove ~/.tmux.conf --dry-run
 ```
 
 Removing a declaration keeps the file and its receipt (reported as undeclared).
-Only `pkgx file remove` deletes a file, and only a managed file still identical to its
+Only `xpac file remove` deletes a file, and only a managed file still identical to its
 receipt, after preview, confirmation and a private backup; drifted or unmanaged
-files are never deleted. `export` never includes files. `pkgx file list`
+files are never deleted. `export` never includes files. `xpac file list`
 reports each receipt as intact, drifted, missing or unsupported without a manifest.
 The TUI manifest review (m) shows file states read-only; only `apply -f` writes.
 
@@ -106,12 +106,12 @@ version and explicit migration preserving the original; no migration is implicit
 ## Explicit strict scope (experimental APT)
 
 First review and grant individual, concrete installed package identities. This
-changes only pkgx state and does not install or remove native software:
+changes only xpac state and does not install or remove native software:
 
 ```sh
-pkgx manage apt:hello:amd64 --dry-run
-pkgx manage apt:hello:amd64
-pkgx managed --json
+xpac manage apt:hello:amd64 --dry-run
+xpac manage apt:hello:amd64
+xpac managed --json
 ```
 
 Use the real architecture of the installed package. Confirmation is interactive
@@ -120,10 +120,10 @@ Use the real architecture of the installed package. Confirmation is interactive
 APT section. Review it using diff and plan before apply:
 
 ```sh
-pkgx diff -f examples/strict.toml
-pkgx plan -f examples/strict.toml
-pkgx apply -f examples/strict.toml --dry-run
-pkgx apply -f examples/strict.toml
+xpac diff -f examples/strict.toml
+xpac plan -f examples/strict.toml
+xpac apply -f examples/strict.toml --dry-run
+xpac apply -f examples/strict.toml
 ```
 
 Changing the recorded native version or reason invalidates the grant for removal.

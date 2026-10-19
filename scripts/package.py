@@ -27,7 +27,7 @@ def regular_bytes(path):
 
 def publish(path, data):
     """Publish without overwriting an existing artifact or following its symlink."""
-    with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".pkgx-", delete=False) as temp:
+    with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".xpac-", delete=False) as temp:
         staging = Path(temp.name)
         try:
             temp.write(data)
@@ -51,7 +51,7 @@ def package(binary, target, output_dir, epoch, rustc_info=None):
     compiler = regular_bytes(rustc_info).decode("utf-8") if rustc_info else None
     if compiler is not None and len(compiler) > 16384:
         raise ValueError("compiler information exceeds 16 KiB")
-    root_name = f"pkgx-v{version}-{target}"
+    root_name = f"xpac-v{version}-{target}"
     manifest = {
         "schema_version": 1,
         "version": version,
@@ -63,12 +63,12 @@ def package(binary, target, output_dir, epoch, rustc_info=None):
         "native_certification": False,
     }
     files = {
-        "pkgx": (binary_bytes, 0o755),
+        "xpac": (binary_bytes, 0o755),
         "BUILD.json": ((json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode(), 0o644),
     }
     names = ["README.md", "REFERENCE.md", "CHANGELOG.md", "LICENSE",
-             "LICENSE-MIT", "LICENSE-APACHE", "pkgx.md",
-             "completions/pkgx.bash", "completions/_pkgx", "completions/pkgx.fish"]
+             "LICENSE-MIT", "LICENSE-APACHE", "xpac.md",
+             "completions/xpac.bash", "completions/_xpac", "completions/xpac.fish"]
     names += [str(path.relative_to(ROOT)) for path in sorted((ROOT / "docs").rglob("*.md"))]
     names += [str(path.relative_to(ROOT)) for path in sorted((ROOT / "examples").glob("*.toml"))]
     for name in names:

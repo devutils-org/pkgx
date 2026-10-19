@@ -1,4 +1,4 @@
-# pkgx — reference
+# xpac — reference
 
 [Back to the overview](README.md). Detailed usage and implementation notes.
 
@@ -7,30 +7,30 @@ TOML reconciliation of packages and home-relative configuration files. Native ex
 Arch, Fedora containers and macOS) passes, without any certification claim.
 
 ```sh
-cargo run -p pkgx-cli -- providers
-cargo run -p pkgx-cli -- doctor --json
-cargo run -p pkgx-cli -- list --provider apt --json
-cargo run -p pkgx-cli -- search 'curl' --provider apt
-cargo run -p pkgx-cli -- search curl --provider dnf --installed
-cargo run -p pkgx-cli -- info apt:curl
-cargo run -p pkgx-cli -- why apt:curl:amd64
-cargo run -p pkgx-cli -- deps apt:curl:amd64
-cargo run -p pkgx-cli -- install apt:curl --dry-run
-cargo run -p pkgx-cli -- remove apt:curl --dry-run
-cargo run -p pkgx-cli -- export --provider apt -o system.toml
-cargo run -p pkgx-cli -- diff -f examples/profiles.toml --profile dev
-cargo run -p pkgx-cli -- plan -f system.toml
-cargo run -p pkgx-cli -- plan apt:curl --save preview.json --expires-in 300
-cargo run -p pkgx-cli -- apply --plan preview.json --dry-run
-cargo run -p pkgx-cli -- apply -f system.toml --dry-run
-cargo run -p pkgx-cli -- audit --provider apt
-cargo run -p pkgx-cli -- clean --provider apt --dry-run
-cargo run -p pkgx-cli -- history --limit 20 --offset 0 --json
-cargo run -p pkgx-cli -- tui --provider apt
-cargo run -p pkgx-cli -- file adopt ~/.tmux.conf --dry-run
-cargo run -p pkgx-cli -- file list
-cargo run -p pkgx-cli -- recipe check -f tests/fixtures/recipe.toml
-cargo run -p pkgx-cli -- completions bash
+cargo run -p xpac-cli -- providers
+cargo run -p xpac-cli -- doctor --json
+cargo run -p xpac-cli -- list --provider apt --json
+cargo run -p xpac-cli -- search 'curl' --provider apt
+cargo run -p xpac-cli -- search curl --provider dnf --installed
+cargo run -p xpac-cli -- info apt:curl
+cargo run -p xpac-cli -- why apt:curl:amd64
+cargo run -p xpac-cli -- deps apt:curl:amd64
+cargo run -p xpac-cli -- install apt:curl --dry-run
+cargo run -p xpac-cli -- remove apt:curl --dry-run
+cargo run -p xpac-cli -- export --provider apt -o system.toml
+cargo run -p xpac-cli -- diff -f examples/profiles.toml --profile dev
+cargo run -p xpac-cli -- plan -f system.toml
+cargo run -p xpac-cli -- plan apt:curl --save preview.json --expires-in 300
+cargo run -p xpac-cli -- apply --plan preview.json --dry-run
+cargo run -p xpac-cli -- apply -f system.toml --dry-run
+cargo run -p xpac-cli -- audit --provider apt
+cargo run -p xpac-cli -- clean --provider apt --dry-run
+cargo run -p xpac-cli -- history --limit 20 --offset 0 --json
+cargo run -p xpac-cli -- tui --provider apt
+cargo run -p xpac-cli -- file adopt ~/.tmux.conf --dry-run
+cargo run -p xpac-cli -- file list
+cargo run -p xpac-cli -- recipe check -f tests/fixtures/recipe.toml
+cargo run -p xpac-cli -- completions bash
 ```
 
 Use --profile only when the manifest defines that profile. `examples/system.toml`
@@ -53,7 +53,7 @@ there is no implicit provider fallback. See [backend matrix](docs/backends.md).
 Homebrew formulae) only after a preview and interactive `yes`,
 or explicit --yes. Noninteractive execution without --yes is refused. Revalidation
 follows confirmation. Execution requires native privileges; explicit --sudo can
-delegate the reviewed APT/Pacman transaction without elevating inspection or pkgx state.
+delegate the reviewed APT/Pacman transaction without elevating inspection or xpac state.
 A private transaction journal records intent and verified results. Saved plans expire
 and must match a fresh native plan before execution; see [saved-plan policy](docs/adr/004-saved-plan-review.md). SIGINT/SIGTERM
 cancels subprocess work on Unix. Partial failures never imply rollback.
@@ -62,7 +62,7 @@ Audit and `clean --dry-run` classify findings as safe native cleanup (measured A
 package caches), suggested cleanup (native orphans) and manual review (dpkg residual
 records). `clean --cache` runs only `apt-get clean`/`pacman -Sc` after confirmation;
 `clean --orphans` sends orphan candidates through the reviewed removal executor
-(ADR 009). pkgx never deletes configurations, home data or unmanaged paths itself. The Ratatui frontend supports filtering, info, provenance, orphan inspection and
+(ADR 009). xpac never deletes configurations, home data or unmanaged paths itself. The Ratatui frontend supports filtering, info, provenance, orphan inspection and
 plan review. It is read-only by default. `tui --allow-apply` enables experimental
 APT operations after pressing x and typing apply, with core revalidation, journal
 and cancellable worker progress.
@@ -81,10 +81,10 @@ mode = "0644"
 `diff` reports each file as missing, in sync, outdated, drifted, unmanaged conflict,
 unsupported or undeclared. `plan -f` shows a unified diff; `apply -f` writes files
 atomically as your user after package transactions, with its own confirmation, and
-records private receipts. pkgx copies bytes only: no templates, merging, system paths
-or reload actions. Existing files are never overwritten until `pkgx file adopt`
+records private receipts. xpac copies bytes only: no templates, merging, system paths
+or reload actions. Existing files are never overwritten until `xpac file adopt`
 backs them up and records them; local edits to managed files are reported as drift
-and refused. Only `pkgx file remove` deletes a file, and only an unchanged managed
+and refused. Only `xpac file remove` deletes a file, and only an unchanged managed
 one after preview and backup (`file forget` drops a receipt only). `file list` reports
 whether each managed file is intact, drifted, missing or unsupported; the TUI
 manifest review shows file states read-only. See the [manifest reference](docs/manifest.md#configuration-files-experimental).
@@ -94,7 +94,7 @@ HTTPS download in private temporary storage without executing it. `recipe instal
 runs a verified script as your user only after trust confirmation, for home-relative
 declared resources that did not exist before, and records a receipt; `recipe
 uninstall` runs the recipe's own uninstall action only while owned files still match
-their receipt (ADR 008). pkgx never deletes resource paths itself.
+their receipt (ADR 008). xpac never deletes resource paths itself.
 
 JSON success output goes to stdout with schema_version 1. New results use `data`;
 list/providers/doctor retain their original top-level fields. Runtime errors go to
@@ -112,7 +112,7 @@ or downloaded scripts on the workstation; use disposable environments.
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo build --release --locked -p pkgx-cli
+cargo build --release --locked -p xpac-cli
 ```
 
 Tests use fixtures, injected runners, temporary storage, harmless utilities and a
@@ -125,7 +125,7 @@ disposable roots. The CI matrix passed (GitHub Actions run 39143547380), includi
 transactions and managed files on a disposable macOS runner. No host package
 transaction, cleanup or installation script has run. See [validation status](docs/support.md) and [local results](docs/validation.md),
 [manifest reference](docs/manifest.md), [recipe preparation](docs/recipes.md),
-[failure/recovery](docs/recovery.md), [roadmap](pkgx.md), [current scope](docs/continuation-plan.md) and the hands-on [testing guide](docs/how-to-test.md) (French).
+[failure/recovery](docs/recovery.md), [roadmap](xpac.md), [current scope](docs/continuation-plan.md) and the hands-on [testing guide](docs/how-to-test.md) (French).
 
 In the TUI, Tab cycles through all loaded providers, including providers with an
 empty inventory, then returns to the combined view. The text filter is preserved.
@@ -135,7 +135,7 @@ all providers loaded at startup.
 Try the portable demo on Linux or macOS (no native package manager required):
 
 ```sh
-cargo run -p pkgx-cli -- demo
+cargo run -p xpac-cli -- demo
 ```
 
 This browser uses five synthetic packages and shows a DEMO banner. Try `/curl`,
@@ -143,7 +143,7 @@ Enter, `i`, Esc, Tab to change providers, and `q` to quit. Native plan previews,
 installation and cleanup are unavailable in this mode. For a noninteractive view:
 
 ```sh
-cargo run -p pkgx-cli -- demo --snapshot --json
+cargo run -p xpac-cli -- demo --snapshot --json
 ```
 
 The demo does not inspect installed packages, access the network or write a journal.
@@ -169,8 +169,8 @@ separates cached native inventory from synthetic demo data. ? opens a scrollable
 help overlay; Esc or ? closes it without losing the current selection or review.
 
 Experimental strict APT manifests use separate explicit management grants:
-`pkgx manage apt:hello:amd64 --dry-run` previews a grant, `pkgx managed` lists them,
-and `pkgx manage apt:hello:amd64 --forget` revokes one. No existing or newly installed
+`xpac manage apt:hello:amd64 --dry-run` previews a grant, `xpac managed` lists them,
+and `xpac manage apt:hello:amd64 --forget` revokes one. No existing or newly installed
 package is adopted automatically. See the [strict-mode workflow](docs/manifest.md)
 and [build/install/archive instructions](docs/install.md).
 
@@ -181,15 +181,15 @@ capabilities are retained. These are metadata, not a resolved cross-provider gra
 For explicit privilege delegation on supported Debian/Ubuntu systems:
 
 ```sh
-pkgx install apt:hello --sudo --dry-run
-pkgx install apt:hello --sudo
-pkgx apply -f system.toml --sudo
-pkgx tui --provider apt --allow-apply --sudo
+xpac install apt:hello --sudo --dry-run
+xpac install apt:hello --sudo
+xpac apply -f system.toml --sudo
+xpac tui --provider apt --allow-apply --sudo
 ```
 
 sudo owns password entry after transaction confirmation. The TUI briefly returns
 to the normal terminal for that prompt. In noninteractive sessions, --yes still
-requires a preauthorized sudo session or a passwordless policy; pkgx never reads a
+requires a preauthorized sudo session or a passwordless policy; xpac never reads a
 password from stdin. Native revalidation follows authentication, and the eventual
 transaction uses sudo -n. No-op/dry-run operations never authenticate. See the
 [privilege policy](docs/adr/006-explicit-sudo.md) for fixed-path/configuration limits.

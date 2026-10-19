@@ -1,17 +1,17 @@
 # Script recipes
 
-`pkgx recipe check -f recipe.toml` validates and displays a recipe without downloading.
-`pkgx recipe verify -f recipe.toml` downloads into private temporary storage, verifies
+`xpac recipe check -f recipe.toml` validates and displays a recipe without downloading.
+`xpac recipe verify -f recipe.toml` downloads into private temporary storage, verifies
 SHA-256 and discards the artifact. Neither command executes a script.
 
-`pkgx recipe install -f recipe.toml [--dry-run|--yes]` previews, then (after trust
+`xpac recipe install -f recipe.toml [--dry-run|--yes]` previews, then (after trust
 confirmation) runs the verified script as your user and records a receipt.
-`pkgx recipe uninstall NAME [--dry-run|--yes]` runs the recipe's recorded uninstall
-action after ownership checks. `pkgx recipe list` shows receipts (`tracked` or
+`xpac recipe uninstall NAME [--dry-run|--yes]` runs the recipe's recorded uninstall
+action after ownership checks. `xpac recipe list` shows receipts (`tracked` or
 `tracked_incomplete`, or `observed` when the experimental `--observe` install saw
-undeclared HOME changes); anything else is unmanaged. `pkgx recipe forget NAME` drops a
+undeclared HOME changes); anything else is unmanaged. `xpac recipe forget NAME` drops a
 receipt without running anything or touching files. Receipts live under the state
-directory (`--state-dir`, default `$XDG_STATE_HOME/pkgx/transactions/scripts`).
+directory (`--state-dir`, default `$XDG_STATE_HOME/xpac/transactions/scripts`).
 See [ADR 008](adr/008-script-receipts.md) for the ownership rules.
 
 An installable recipe declares home-relative resources:

@@ -1,6 +1,6 @@
 Inspect, plan and reconcile native packages conservatively
 
-Usage: pkgx [OPTIONS] <COMMAND>
+Usage: xpac [OPTIONS] <COMMAND>
 
 Commands:
   demo         Browse synthetic packages without native tools (read-only)

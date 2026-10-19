@@ -34,7 +34,7 @@ Implemented controls and regression evidence:
   uninstall action and home-relative declared resources that are absent beforehand.
   The stored artifact is re-hashed before each run and passed by path to a fixed
   interpreter. Receipts claim only resources created by the install; uninstall is
-  refused when owned files changed and pkgx itself never deletes resource paths.
+  refused when owned files changed and xpac itself never deletes resource paths.
   Scripts are not confined: undeclared side effects run with user permissions.
 - Audit reads only native cache directories reported by the package manager and
   never traverses arbitrary data paths or purges configurations. Cleanup runs only
@@ -45,7 +45,7 @@ Implemented controls and regression evidence:
 - Strict APT scope is delegated by separate confirmed management grants, never
   inferred from native marks. All native removals must remain in the reviewed
   undeclared grant set; cascades into unmanaged or still-desired identities fail.
-  Registry writer locking and repeated snapshot checks protect against pkgx writers
+  Registry writer locking and repeated snapshot checks protect against xpac writers
   and detect state edits during revalidation. Shared paths and symlinks fail closed.
 
 - Privilege delegation requires --sudo and operation confirmation, followed by
@@ -53,7 +53,7 @@ Implemented controls and regression evidence:
   and matching inspection executable are required. Native database/config overrides
   fail. Only marked APT execution is wrapped; no inspection/state write is elevated.
   Password entry belongs to sudo in the normal terminal and is never captured by
-  pkgx. Transaction-time sudo is noninteractive. Injected tests cover refusal,
+  xpac. Transaction-time sudo is noninteractive. Injected tests cover refusal,
   cancellation, credential expiry and inspection/transaction separation.
 
 Remaining boundaries and evidence gaps:
@@ -99,7 +99,7 @@ Confirmed properties:
   reports differences as failures without claiming rollback.
 - Recipe scripts run only as a non-root user after trust confirmation, through a
   fixed interpreter, from a private store re-hashed before each run. Receipts claim
-  only resources that were absent and then created; pkgx never deletes resource
+  only resources that were absent and then created; xpac never deletes resource
   paths. Observation is metadata-only and never authorizes removal.
 - Cache cleanup measures only native cache directories and runs only the native
   command; orphan cleanup goes through the reviewed removal executor.

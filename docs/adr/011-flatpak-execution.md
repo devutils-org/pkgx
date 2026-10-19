@@ -9,7 +9,7 @@ native queries:
 
 - the ref must be offered by exactly one configured remote of the requested scope
   (`flatpak remotes`, `flatpak remote-info --show-commit`); zero or several remotes
-  are refused, because pkgx never chooses an origin;
+  are refused, because xpac never chooses an origin;
 - the reviewed commit is the remote's full commit digest;
 - an app's runtime (`--show-runtime`) is added when installed in neither scope and
   must be offered by the same remote, otherwise the user installs it explicitly;
@@ -24,5 +24,5 @@ transaction to the reviewed refs: locale and extension refs are not installed
 implicitly. Afterwards each installed ref's origin must equal the reviewed remote and
 its active commit must match the reviewed digest; untouched refs must not change.
 
-Privilege. pkgx never wraps flatpak in sudo: system-scope changes go through
+Privilege. xpac never wraps flatpak in sudo: system-scope changes go through
 Flatpak's own system helper and polkit, and `--sudo` is refused for Flatpak.

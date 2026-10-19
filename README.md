@@ -1,11 +1,11 @@
 <p align="center"><code>devutils / RECONCILE</code></p>
 
-<h1 align="center">pkgx</h1>
+<h1 align="center">xpac</h1>
 
 <p align="center">Know what is installed. Review what changes.</p>
 
 <p align="center">
-  <a href="https://devutils-org.github.io/tools/pkgx/">Website</a> ·
+  <a href="https://devutils-org.github.io/tools/xpac/">Website</a> ·
   <a href="#documentation">Documentation</a> ·
   <a href="https://github.com/devutils-org">devutils</a>
 </p>
@@ -25,9 +25,9 @@ partial failures do not imply rollback. See [support](docs/support.md) and
 From a source checkout with Rust stable:
 
 ```sh
-cargo build --release --locked -p pkgx-cli
+cargo build --release --locked -p xpac-cli
 mkdir -p ~/.local/bin
-install -m 755 target/release/pkgx ~/.local/bin/
+install -m 755 target/release/xpac ~/.local/bin/
 ```
 
 Keep `~/.local/bin` on your `PATH`. Inspection needs the matching native provider;
@@ -36,11 +36,11 @@ Keep `~/.local/bin` on your `PATH`. Inspection needs the matching native provide
 ## Use
 
 ```sh
-pkgx demo                              # synthetic data, no system changes
-pkgx list --provider apt                # installed native packages
-pkgx why apt:curl:amd64                 # installation reason
-pkgx plan -f examples/system.toml       # review a manifest
-pkgx apply -f examples/system.toml --dry-run
+xpac demo                              # synthetic data, no system changes
+xpac list --provider apt                # installed native packages
+xpac why apt:curl:amd64                 # installation reason
+xpac plan -f examples/system.toml       # review a manifest
+xpac apply -f examples/system.toml --dry-run
 ```
 
 APT, Pacman, RPM/DNF, Flatpak and Homebrew consultation are implemented.
@@ -49,7 +49,7 @@ Execution support differs by provider: see the [backend matrix](docs/backends.md
 ## Documentation
 
 [CLI and behavior reference](REFERENCE.md) · [Manifests](docs/manifest.md) ·
-[Recipes](docs/recipes.md) · [Validation](docs/validation.md) · [Roadmap](pkgx.md)
+[Recipes](docs/recipes.md) · [Validation](docs/validation.md) · [Roadmap](xpac.md)
 
 ## Development
 

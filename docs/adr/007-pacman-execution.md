@@ -31,7 +31,7 @@ command: `pacman --sync --needed --noconfirm --noprogressbar --color never --
 --noprogressbar --color never -- <name>`. No `--refresh`, `--sysupgrade`,
 `--recursive`, `--cascade`, `--nosave` or alternate root/config/database options
 are ever produced. Dependency upgrades in a preview are partial-upgrade risks that
-the user must review; pkgx never refreshes sync databases.
+the user must review; xpac never refreshes sync databases.
 
 Pacman cannot pin versions. Verification compares each installed version with the
 reviewed `--print` version and fails if any planned action or untouched package

@@ -42,8 +42,8 @@ sudo, puis reprendre l'affichage proprement.
 Sur le Mac :
 
 ```sh
-orb create debian pkgx-test
-orb -m pkgx-test
+orb create debian xpac-test
+orb -m xpac-test
 ```
 
 Dans la machine :
@@ -53,9 +53,9 @@ sudo apt-get update
 sudo apt-get install -y build-essential curl git
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
-git clone <url-du-dépôt> ~/pkgx && cd ~/pkgx
-CARGO_TARGET_DIR=$HOME/pkgx-target cargo build --release --locked -p pkgx-cli
-sudo install -m 0755 $HOME/pkgx-target/release/pkgx /usr/local/bin/pkgx
+git clone <url-du-dépôt> ~/xpac && cd ~/xpac
+CARGO_TARGET_DIR=$HOME/xpac-target cargo build --release --locked -p xpac-cli
+sudo install -m 0755 $HOME/xpac-target/release/xpac /usr/local/bin/xpac
 ```
 
 L'utilisateur par défaut d'OrbStack a sudo **sans** mot de passe. Pour voir une
@@ -79,7 +79,7 @@ version = 1
 [packages.apt]
 install = ['hello']
 EOF
-pkgx tui --allow-apply --sudo -f ~/hello.toml --state-dir ~/pkgx-records
+xpac tui --allow-apply --sudo -f ~/hello.toml --state-dir ~/xpac-records
 ```
 
 1. `m` : aperçu du plan du manifeste (installation de `hello`).
@@ -95,7 +95,7 @@ pkgx tui --allow-apply --sudo -f ~/hello.toml --state-dir ~/pkgx-records
 ### Suppression depuis l'inventaire
 
 ```sh
-pkgx tui --allow-apply --sudo --state-dir ~/pkgx-records
+xpac tui --allow-apply --sudo --state-dir ~/xpac-records
 ```
 
 1. `/` puis `hello` pour filtrer, sélectionner le paquet.
@@ -110,10 +110,10 @@ pkgx tui --allow-apply --sudo --state-dir ~/pkgx-records
 ### Journal et nettoyage
 
 ```sh
-pkgx history --state-dir ~/pkgx-records
+xpac history --state-dir ~/xpac-records
 exit                     # retour à l'utilisateur par défaut
 exit                     # sortie de la machine
-orb delete pkgx-test     # sur le Mac
+orb delete xpac-test     # sur le Mac
 ```
 
 - [ ] l'historique contient les transactions avec leur résultat.
@@ -128,21 +128,21 @@ la CI. Depuis le dépôt sur le Mac, construire le binaire statique comme la CI
 docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src rust:1 sh -c \
   'apt-get update && apt-get install -y musl-tools &&
    rustup target add x86_64-unknown-linux-musl &&
-   cargo build --release --locked --target x86_64-unknown-linux-musl -p pkgx-cli'
-BIN=$PWD/target/x86_64-unknown-linux-musl/release/pkgx
+   cargo build --release --locked --target x86_64-unknown-linux-musl -p xpac-cli'
+BIN=$PWD/target/x86_64-unknown-linux-musl/release/xpac
 ```
 
 Puis, par exemple :
 
 ```sh
-docker run --rm --platform linux/amd64 -v "$BIN:/usr/local/bin/pkgx:ro" \
+docker run --rm --platform linux/amd64 -v "$BIN:/usr/local/bin/xpac:ro" \
   -v "$PWD/tests/containers:/checks:ro" debian:bookworm-slim sh -c \
   'apt-get update && sh /checks/inspection.sh && sh /checks/transactions.sh &&
    sh /checks/privilege.sh && sh /checks/privilege-pam.sh'
-docker run --rm --platform linux/amd64 -v "$BIN:/usr/local/bin/pkgx:ro" \
+docker run --rm --platform linux/amd64 -v "$BIN:/usr/local/bin/xpac:ro" \
   -v "$PWD/tests/containers:/checks:ro" archlinux:base sh -c \
   'pacman -Sy --noconfirm && sh /checks/pacman.sh && sh /checks/pacman-transactions.sh'
-docker run --rm --platform linux/amd64 -v "$BIN:/usr/local/bin/pkgx:ro" \
+docker run --rm --platform linux/amd64 -v "$BIN:/usr/local/bin/xpac:ro" \
   -v "$PWD/tests/containers:/checks:ro" fedora:latest sh -c \
   'sh /checks/rpm.sh && sh /checks/dnf-transactions.sh'
 ```
@@ -156,9 +156,9 @@ qu'à reproduire un échec en local. Tart demande un Mac Apple Silicon.
 
 ```sh
 brew install cirruslabs/cli/tart
-tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest pkgx-test
-tart run pkgx-test &
-ssh admin@"$(tart ip pkgx-test)"          # mot de passe : admin
+tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest xpac-test
+tart run xpac-test &
+ssh admin@"$(tart ip xpac-test)"          # mot de passe : admin
 ```
 
 Dans la VM (Homebrew est préinstallé dans l'image) :
@@ -166,18 +166,18 @@ Dans la VM (Homebrew est préinstallé dans l'image) :
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
-git clone <url-du-dépôt> ~/pkgx && cd ~/pkgx
-cargo build --locked -p pkgx-cli
-PKGX_DISPOSABLE=1 PATH="$PWD/target/debug:$PATH" sh tests/containers/brew-transactions.sh
+git clone <url-du-dépôt> ~/xpac && cd ~/xpac
+cargo build --locked -p xpac-cli
+XPAC_DISPOSABLE=1 PATH="$PWD/target/debug:$PATH" sh tests/containers/brew-transactions.sh
 ```
 
 - [ ] le script se termine par `homebrew checks passed`.
 
 Le script retire `jq`/`oniguruma` s'ils sont présents et `clean --orphans` supprime
-**toutes** les formules orphelines : il refuse de tourner sans `PKGX_DISPOSABLE=1`.
+**toutes** les formules orphelines : il refuse de tourner sans `XPAC_DISPOSABLE=1`.
 Ne jamais définir cette variable sur le Mac de tous les jours.
 
-Nettoyage, sur le Mac : `tart stop pkgx-test && tart delete pkgx-test`.
+Nettoyage, sur le Mac : `tart stop xpac-test && tart delete xpac-test`.
 
 ## 4. Hors périmètre de ces tests
 

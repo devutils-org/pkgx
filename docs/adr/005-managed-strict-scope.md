@@ -2,9 +2,9 @@
 
 Status: implemented with injected-runner evidence; native container acceptance pending.
 
-Native installation marks and existing packages do not prove that pkgx was asked
+Native installation marks and existing packages do not prove that xpac was asked
 to manage them. Installing, exporting or observing a package never grants it to
-pkgx implicitly. `manage apt:package:architecture` is a separate user decision:
+xpac implicitly. `manage apt:package:architecture` is a separate user decision:
 after preview and confirmation it records the concrete native identity, observed
 version and installation reason. `manage --forget` revokes that delegation without
 querying a native tool or uninstalling the package. Neither action claims file
@@ -12,7 +12,7 @@ ownership. Other providers and scripts cannot receive these APT grants.
 
 The private versioned JSON registry lives below `<state-dir>/managed/registry.json`.
 It is separate from journal entries. Reads create nothing. Writes use a private
-exclusive lock file, atomic rename and fsync. A crash can leave a lock; pkgx refuses
+exclusive lock file, atomic rename and fsync. A crash can leave a lock; xpac refuses
 automatic lock removal. Unknown fields, malformed state, duplicate identities,
 non-private paths, symlinks and snapshots changed since review fail closed.
 

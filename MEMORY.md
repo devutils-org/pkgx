@@ -1,18 +1,18 @@
-# Mémoire du projet pkgx
+# Mémoire du projet xpac
 
 Point de reprise enregistré le 18 octobre 2026.
 
 ## Objectif et préférences
 
-Continuer en autonomie l’implémentation de `pkgx.md`, avec une interface TUI inspirée de `../atfq` et `../omniscient`. Communiquer en français. Ne pas annoncer 100 % : macOS, CI réelle et publication restent à faire.
+Continuer en autonomie l’implémentation de `xpac.md`, avec une interface TUI inspirée de `../atfq` et `../omniscient`. Communiquer en français. Ne pas annoncer 100 % : macOS, CI réelle et publication restent à faire.
 
 ## État livré
 
-- Workspace Rust 0.1.0 : `crates/pkgx-core` et `crates/pkgx-cli`, binaire `pkgx`.
+- Workspace Rust 0.1.0 : `crates/xpac-core` et `crates/xpac-cli`, binaire `xpac`.
 - Exécuteurs revus pour APT, Pacman (ADR 007), DNF5 (ADR 010), Flatpak (ADR 011) et Homebrew formules (ADR 012) : préversion, confirmation, revalidation, journal, vérification post-transaction, `--sudo` limité à des modèles exacts (pas pour Flatpak/Homebrew). Aucun rollback garanti.
 - Manifestes TOML additifs/stricts (strict limité aux autorisations APT, ADR 005), application par fournisseur dans un ordre stable.
-- Recettes : installation/désinstallation suivies avec reçus, ressources `~/` uniquement, confiance explicite, jamais root, pkgx ne supprime jamais de chemin (ADR 008) ; `--observe` expérimental.
-- Fichiers de config gérés (ADR 013, M8) : table `files` du manifeste, `diff`/`plan -f`/`apply -f`, `pkgx file adopt|list|forget|remove` avec sauvegardes privées ; copie d'octets uniquement, `~/` seulement ; sandbox `files-userns.sh` réussi ; `file list` donne l'état des reçus, TUI en lecture seule. M8 terminé hors macOS ; idées suivantes : écritures depuis le TUI, templates/secrets (nouvelle ADR).
+- Recettes : installation/désinstallation suivies avec reçus, ressources `~/` uniquement, confiance explicite, jamais root, xpac ne supprime jamais de chemin (ADR 008) ; `--observe` expérimental.
+- Fichiers de config gérés (ADR 013, M8) : table `files` du manifeste, `diff`/`plan -f`/`apply -f`, `xpac file adopt|list|forget|remove` avec sauvegardes privées ; copie d'octets uniquement, `~/` seulement ; sandbox `files-userns.sh` réussi ; `file list` donne l'état des reçus, TUI en lecture seule. M8 terminé hors macOS ; idées suivantes : écritures depuis le TUI, templates/secrets (nouvelle ADR).
 - Nettoyage : classes safe/suggested/manual, `clean --cache` (apt-get clean / pacman -Sc) et `clean --orphans` via l’exécuteur revu (ADR 009).
 - TUI, démo, complétions, packaging déterministe ; archives locales x86_64 gnu/musl dans `dist/` (non publiées).
 
@@ -22,13 +22,13 @@ Racines jetables sans privilèges dans `tests/sandbox/` (namespaces utilisateur,
 
 ## Commandes
 
-Toujours définir `CARGO_TARGET_DIR=/tmp/pkgx-target`.
+Toujours définir `CARGO_TARGET_DIR=/tmp/xpac-target`.
 
 ```sh
 cargo fmt --check
-CARGO_TARGET_DIR=/tmp/pkgx-target cargo clippy --workspace --all-targets --locked --offline -- -D warnings
-CARGO_TARGET_DIR=/tmp/pkgx-target cargo test --workspace --locked --offline -q
-CARGO_TARGET_DIR=/tmp/pkgx-target cargo build --release --locked --offline --target x86_64-unknown-linux-musl -p pkgx-cli
+CARGO_TARGET_DIR=/tmp/xpac-target cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+CARGO_TARGET_DIR=/tmp/xpac-target cargo test --workspace --locked --offline -q
+CARGO_TARGET_DIR=/tmp/xpac-target cargo build --release --locked --offline --target x86_64-unknown-linux-musl -p xpac-cli
 python3 scripts/test_package.py
 ```
 
@@ -44,4 +44,4 @@ Ne jamais exécuter de transaction native, de sudo ou de script téléchargé su
 
 ## Git
 
-Remote `origin` = `https://github.com/moha-bekh/pkgx.git`, branche `main`. Créer des commits locaux et laisser l’utilisateur pousser ; ne pas pousser sans nouvelle demande. Le SSH n’a pas d’agent dans les sessions Claude : pousser en HTTPS avec `git -c credential.helper='!gh auth git-credential' push https://github.com/moha-bekh/pkgx.git main` (le dépôt redirige vers devutils-org/pkgx).
+Remote `origin` = `https://github.com/devutils-org/xpac.git`, branche `main`. Créer des commits locaux et laisser l’utilisateur pousser ; ne pas pousser sans nouvelle demande. Le SSH n’a pas d’agent dans les sessions Claude : pousser en HTTPS avec `git -c credential.helper='!gh auth git-credential' push https://github.com/devutils-org/xpac.git main` .

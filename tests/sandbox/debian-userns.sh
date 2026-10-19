@@ -1,18 +1,18 @@
 #!/bin/sh
 # Disposable Debian/Ubuntu-style root for native APT validation, built rootlessly.
 #
-# Usage: tests/sandbox/debian-userns.sh WORKDIR STATIC_PKGX [SUITE [MIRROR]] [-- CHECK...]
+# Usage: tests/sandbox/debian-userns.sh WORKDIR STATIC_XPAC [SUITE [MIRROR]] [-- CHECK...]
 #
 # A disposable Arch tool root provides debootstrap and the Debian archive keyring
 # (Arch-signed packages). Everything runs in a user namespace mapping the
 # subordinate UID range (unshare --map-auto), so dpkg can own files as Debian
 # expects. The host package databases are never targets: host files owned by the
-# real root are not writable from the namespace. STATIC_PKGX must be static (musl).
+# real root are not writable from the namespace. STATIC_XPAC must be static (musl).
 # The Debian root lives on a tmpfs mounted inside the namespace: setuid sudo works
 # there (the scratch /tmp is nosuid) and the root disappears with the namespace.
 set -eu
-WORK=${1:?usage: debian-userns.sh WORKDIR STATIC_PKGX [SUITE [MIRROR]]}
-PKGX=${2:?usage: debian-userns.sh WORKDIR STATIC_PKGX [SUITE [MIRROR]]}
+WORK=${1:?usage: debian-userns.sh WORKDIR STATIC_XPAC [SUITE [MIRROR]]}
+XPAC=${2:?usage: debian-userns.sh WORKDIR STATIC_XPAC [SUITE [MIRROR]]}
 SUITE=${3:-bookworm}
 MIRROR=${4:-http://deb.debian.org/debian}
 CHECKS=${CHECKS:-inspection.sh transactions.sh privilege.sh privilege-pam.sh}
@@ -50,7 +50,7 @@ full env LC_ALL=C pacman --root "$TOOLS" --dbpath "$TOOLS/var/lib/pacman" \
     debootstrap debian-archive-keyring ubuntu-keyring ca-certificates \
     coreutils grep sed gawk tar gzip xz zstd binutils findutils util-linux
 NAME=$(basename "$(mktemp -d "$TOOLS/srv/$SUITE.XXXXXX")")
-export TOOLS NAME SUITE MIRROR CHECKS PKGX CHECK_DIR
+export TOOLS NAME SUITE MIRROR CHECKS XPAC CHECK_DIR
 full sh -eu <<'INNER'
 mount -t tmpfs -o mode=0755 tmpfs "$TOOLS/srv/$NAME"
 mkdir -p "$TOOLS/var/cache/debootstrap"
@@ -64,7 +64,7 @@ chroot "$TOOLS" /usr/bin/env -i PATH=/usr/bin LC_ALL=C \
     --cache-dir=/var/cache/debootstrap "$SUITE" "/srv/$NAME" "$MIRROR"
 DEB="$TOOLS/srv/$NAME"
 mkdir -p "$DEB/checks"
-cp "$PKGX" "$DEB/usr/local/bin/pkgx"
+cp "$XPAC" "$DEB/usr/local/bin/xpac"
 mount --bind "$CHECK_DIR" "$DEB/checks"
 mount --rbind /dev "$DEB/dev"
 # A private devpts instance lets sudo's use_pty allocate terminals in the namespace.

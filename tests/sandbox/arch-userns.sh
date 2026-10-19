@@ -1,7 +1,7 @@
 #!/bin/sh
 # Disposable Arch root inside an unprivileged user namespace.
 #
-# Usage: tests/sandbox/arch-userns.sh WORKDIR PKGX_BINARY [CHECK...]
+# Usage: tests/sandbox/arch-userns.sh WORKDIR XPAC_BINARY [CHECK...]
 #
 # The host package database is never a target: pacman is always given an
 # explicit --root/--dbpath/--cachedir under WORKDIR, host files owned by the real
@@ -10,8 +10,8 @@
 # afterwards unless KEEP_ROOT=1; WORKDIR/cache keeps downloaded packages. Requires bwrap, network
 # access to the configured mirrors and an Arch host pacman.
 set -eu
-WORK=${1:?usage: arch-userns.sh WORKDIR PKGX_BINARY [CHECK...]}
-PKGX=${2:?usage: arch-userns.sh WORKDIR PKGX_BINARY [CHECK...]}
+WORK=${1:?usage: arch-userns.sh WORKDIR XPAC_BINARY [CHECK...]}
+XPAC=${2:?usage: arch-userns.sh WORKDIR XPAC_BINARY [CHECK...]}
 shift 2
 CHECKS=$(cd "$(dirname "$0")/../containers" && pwd)
 [ "$(id -u)" -ne 0 ] || { echo 'refusing to run as real root' >&2; exit 1; }
@@ -51,7 +51,7 @@ userns --bind / / --dev /dev --proc /proc \
 cp /etc/resolv.conf "$ROOT/etc/resolv.conf"
 in_root() {
     userns --bind "$ROOT" / --dev /dev --proc /proc --tmpfs /tmp \
-        --bind "$CACHE" /var/cache/pacman/pkg --ro-bind "$PKGX" /usr/local/bin/pkgx --ro-bind "$CHECKS" /checks \
+        --bind "$CACHE" /var/cache/pacman/pkg --ro-bind "$XPAC" /usr/local/bin/xpac --ro-bind "$CHECKS" /checks \
         env -i PATH=/usr/local/bin:/usr/bin HOME=/tmp LC_ALL=C "$@"
 }
 for check in "${@:-pacman.sh pacman-transactions.sh}"; do

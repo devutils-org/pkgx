@@ -8,7 +8,7 @@ Scope: formulae only. Casks are refused for execution (their app bundles and
 uninstall stanzas are outside this contract). Homebrew is never run as root or
 through sudo; `--sudo` is refused for Homebrew.
 
-Every pkgx-built brew command sets HOMEBREW_NO_AUTO_UPDATE, NO_ANALYTICS,
+Every xpac-built brew command sets HOMEBREW_NO_AUTO_UPDATE, NO_ANALYTICS,
 NO_INSTALL_CLEANUP, NO_ENV_HINTS, NO_COLOR and NO_AUTOREMOVE. The last one matters:
 since Homebrew 4.3, `brew uninstall` autoremoves unused dependencies, which the
 native validation caught as an unreviewed effect.

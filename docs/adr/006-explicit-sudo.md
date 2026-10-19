@@ -10,9 +10,9 @@ remove, apply, or tui --allow-apply. Operation review/confirmation still comes f
 never authenticate. Inspection has no elevation path.
 
 After confirmation, sudo validates credentials before native revalidation. With
-interactive stdin/stderr, pkgx runs /usr/bin/sudo -v -u root in the normal foreground
+interactive stdin/stderr, xpac runs /usr/bin/sudo -v -u root in the normal foreground
 terminal, with a 120-second timeout and signal cancellation. Only sudo reads the
-password via its terminal UI. pkgx does not read, pipe, store or log credentials.
+password via its terminal UI. xpac does not read, pipe, store or log credentials.
 stdout is closed for the credential process so JSON remains a single result.
 Without interactive stdin/stderr, sudo -n -v -u root requires an existing authorization or
 passwordless policy and refuses immediately otherwise. Authentication failure
@@ -47,7 +47,7 @@ terminal validation. No sudo command was executed on the development host.
 Native option/policy references: [sudo(8)](https://manpages.debian.org/bookworm/sudo/sudo.8.en.html)
 and [sudoers(5)](https://manpages.debian.org/bookworm/sudo/sudoers.5.en.html).
 The noninteractive option refuses password prompts, and passwordless validation
-still depends on sudoers policy; pkgx never changes that policy.
+still depends on sudoers policy; xpac never changes that policy.
 
 Cancellation sends SIGTERM to the delegate's process group, preserving the
 unreaped leader while sudo has up to three seconds to relay it. Forced cleanup

@@ -16,4 +16,4 @@ of Essential/Protected packages. Plans remain uncertain; execution requires expl
 
 Declarative state: version 1; additive default; unknown keys and script package sections fail with explicit errors; implemented
 providers have scoped identities and platform/profile layers resolve deterministically. Strict reconciliation refuses until managed ownership
-exists; native manual marks do not prove pkgx ownership. No undeclared removals.
+exists; native manual marks do not prove xpac ownership. No undeclared removals.

@@ -3,7 +3,7 @@
 Status: implemented experimentally; simulated-interpreter regressions and a real
 install/uninstall in a loopback-only bubblewrap sandbox (docs/validation.md).
 
-A recipe becomes executable only through `pkgx recipe install`, which requires:
+A recipe becomes executable only through `xpac recipe install`, which requires:
 
 - a valid strict recipe with pinned version, concrete SHA-256 and HTTPS source;
 - an explicit `uninstall` action and at least one declared resource;
@@ -16,7 +16,7 @@ A recipe becomes executable only through `pkgx recipe install`, which requires:
 Execution. The verified download is stored in a private content-addressed store and
 re-hashed in-process before every run. It is passed by path to a fixed interpreter
 (`/bin/sh`, `/bin/bash` or `/usr/bin/python3`) with the recipe's literal arguments
-plus PKGX_RECIPE_NAME/PKGX_RECIPE_VERSION. No shell string, pipe or sudo is used. The
+plus XPAC_RECIPE_NAME/XPAC_RECIPE_VERSION. No shell string, pipe or sudo is used. The
 script runs with the user's full permissions; it is not confined.
 
 Receipts. A private atomic receipt with status `install_started` is written before
@@ -31,7 +31,7 @@ Uninstall. Interrupted receipts (`*_started`) are refused: ownership is unknown 
 `recipe forget` only drops the receipt. Otherwise every owned file/link/service must
 still match its evidence (configuration may be edited) and the stored artifact must
 still match the digest, or nothing runs. The recipe's own uninstall action is the only
-remover: pkgx never deletes resource paths itself. Afterwards owned file/link/service
+remover: xpac never deletes resource paths itself. Afterwards owned file/link/service
 resources must be gone; configuration may remain and is reported for manual review.
 Success removes the receipt and its unreferenced artifact; otherwise the receipt
 stays `uninstall_incomplete`.

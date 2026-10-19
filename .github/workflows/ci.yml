@@ -26,13 +26,13 @@ jobs:
         with:
           targets: x86_64-unknown-linux-musl
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - run: cargo build --release --locked --target x86_64-unknown-linux-musl -p pkgx-cli
+      - run: cargo build --release --locked --target x86_64-unknown-linux-musl -p xpac-cli
       - name: Validate native APT in disposable container
         env:
           CONTAINER_IMAGE: ${{ matrix.image }}
         run: |
           docker run --rm \
-            -v "$PWD/target/x86_64-unknown-linux-musl/release/pkgx:/usr/local/bin/pkgx:ro" \
+            -v "$PWD/target/x86_64-unknown-linux-musl/release/xpac:/usr/local/bin/xpac:ro" \
             -v "$PWD/tests/containers:/checks:ro" \
             "$CONTAINER_IMAGE" sh -c 'apt-get update && sh /checks/inspection.sh && sh /checks/transactions.sh && sh /checks/privilege.sh && sh /checks/privilege-pam.sh'
 
@@ -52,14 +52,14 @@ jobs:
         with:
           targets: x86_64-unknown-linux-musl
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - run: cargo build --release --locked --target x86_64-unknown-linux-musl -p pkgx-cli
+      - run: cargo build --release --locked --target x86_64-unknown-linux-musl -p xpac-cli
       - name: Inspect disposable native package database
         env:
           CONTAINER_IMAGE: ${{ matrix.image }}
           CONTAINER_CHECK: ${{ matrix.check }}
         run: |
           docker run --rm \
-            -v "$PWD/target/x86_64-unknown-linux-musl/release/pkgx:/usr/local/bin/pkgx:ro" \
+            -v "$PWD/target/x86_64-unknown-linux-musl/release/xpac:/usr/local/bin/xpac:ro" \
             -v "$PWD/tests/containers:/checks:ro" \
             "$CONTAINER_IMAGE" sh -c "$CONTAINER_CHECK"
   recipe-sandbox:
@@ -70,29 +70,29 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap
       # Ubuntu restricts unprivileged user namespaces through AppArmor by default.
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: cargo build --locked -p pkgx-cli
-      - run: sh tests/sandbox/recipe-userns.sh target/debug/pkgx
-      - run: sh tests/sandbox/files-userns.sh "$PWD/target/debug/pkgx"
+      - run: cargo build --locked -p xpac-cli
+      - run: sh tests/sandbox/recipe-userns.sh target/debug/xpac
+      - run: sh tests/sandbox/files-userns.sh "$PWD/target/debug/xpac"
   macos-smoke:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --workspace --locked
-      - run: cargo run --locked -p pkgx-cli -- providers --json
-      - run: cargo run --locked -p pkgx-cli -- list --provider brew --json
+      - run: cargo run --locked -p xpac-cli -- providers --json
+      - run: cargo run --locked -p xpac-cli -- list --provider brew --json
       # The hosted runner is discarded after the job: real Homebrew transactions.
       - name: Validate native Homebrew transactions on the disposable runner
         env:
-          PKGX_DISPOSABLE: '1'
+          XPAC_DISPOSABLE: '1'
           HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: |
-          cargo build --locked -p pkgx-cli
+          cargo build --locked -p xpac-cli
           PATH="$PWD/target/debug:$PATH" sh tests/containers/brew-transactions.sh
       # Managed configuration files with a private HOME below the runner's temp.
       - name: Validate managed configuration files on the disposable runner
         env:
-          PKGX_DISPOSABLE: '1'
+          XPAC_DISPOSABLE: '1'
         run: |
-          PKGX_ROOT="$RUNNER_TEMP/pkgx-files" PKGX_BIN="$PWD/target/debug/pkgx" \
+          XPAC_ROOT="$RUNNER_TEMP/xpac-files" XPAC_BIN="$PWD/target/debug/xpac" \
             sh tests/sandbox/files-checks.sh

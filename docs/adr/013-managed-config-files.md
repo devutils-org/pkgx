@@ -1,15 +1,15 @@
 # ADR 013: Managed user configuration files
 
 Status: implemented experimentally in the CLI. Schema, layering, confined sources,
-`diff` states, `plan -f`/`apply -f` writes and `pkgx file adopt|list|forget|remove`
+`diff` states, `plan -f`/`apply -f` writes and `xpac file adopt|list|forget|remove`
 have unit and CLI regressions and passed a bubblewrap sandbox with a private HOME
-(tests/sandbox/files-userns.sh, docs/validation.md). `pkgx file list` reports each
+(tests/sandbox/files-userns.sh, docs/validation.md). `xpac file list` reports each
 receipt as intact, drifted, missing or unsupported. The TUI manifest review shows file
 states read-only and never writes files; the core package planners refuse manifests
 declaring files. macOS is unvalidated. Roadmap milestone M8.
 
 Users want their configuration (e.g. `~/.tmux.conf`) declared next to the packages
-that read it. pkgx manages such files as opaque owned content: it copies declared
+that read it. xpac manages such files as opaque owned content: it copies declared
 bytes and tracks what it wrote. It never parses, merges, templates or generates
 application configuration, and it never runs reload actions.
 
@@ -32,7 +32,7 @@ Each declaration accepts only `source` (required) and `mode` (optional, default
 `0600`; allowed `0600`, `0644`, `0700`, `0755`). Unknown fields, inline content,
 variables, globs, directories and interpolation are rejected. This stays
 `version = 1`: every existing manifest remains valid with identical meaning, and an
-older pkgx rejects the unknown `files` field instead of silently ignoring it.
+older xpac rejects the unknown `files` field instead of silently ignoring it.
 
 Targets must start with `~/`, are normalized lexically (no `.`/`..` components, empty
 components or trailing slash) and must resolve below the invoking user's absolute
@@ -73,11 +73,11 @@ contents are displayed.
 Receipts and adoption. A private versioned registry under `<state-dir>/files/` (same
 locking, atomic write, fsync and fail-closed rules as ADR 005) stores per target: the
 written SHA-256, size and mode, the source digest and the manifest path. Ownership is
-only ever granted by a pkgx write or by an explicit adoption:
+only ever granted by a xpac write or by an explicit adoption:
 
 ```sh
-pkgx file adopt ~/.tmux.conf --dry-run
-pkgx file adopt ~/.tmux.conf
+xpac file adopt ~/.tmux.conf --dry-run
+xpac file adopt ~/.tmux.conf
 ```
 
 Adoption previews the current content, copies it to a private content-addressed backup
@@ -85,7 +85,7 @@ Adoption previews the current content, copies it to a private content-addressed 
 records the current digest as the receipt. The next `apply` therefore sees the file as
 `outdated` and replaces it after the usual review. Re-adopting a `drifted` file is how
 local edits are discarded deliberately; the edited bytes are backed up first.
-`pkgx file list` shows receipts; `pkgx file forget TARGET` drops a receipt and touches
+`xpac file list` shows receipts; `xpac file forget TARGET` drops a receipt and touches
 nothing on disk.
 
 Writing. `apply -f` plans files before any package transaction (conflicts abort
@@ -95,19 +95,19 @@ privileges: writes as root are refused, and `--sudo` never applies to them. For 
 target, immediately before writing, the registry snapshot, the target's planned state
 (absent, or digest and mode) and the re-read source digest must all still match the
 review. Missing parent directories are created with mode 0700 without following
-symlinks. Content goes to an exclusively created `.pkgx-*` temporary file in the same
+symlinks. Content goes to an exclusively created `.xpac-*` temporary file in the same
 directory, gets its mode, is fsynced, renamed over the target (no-clobber for creates;
 a rename replaces a racing symlink itself rather than following it) and the directory
 is fsynced; then the receipt is updated and the result verified. The first failure
 stops later files. File writes are not in the native transaction journal; receipts are
 their record. A crash after the rename but before the receipt leaves a file reported as
 `in_sync` (updates) or `unmanaged_conflict` (creates, adopt to resume); a crash before
-the rename may leave a `.pkgx-*` temporary file. A concurrent process can still change
+the rename may leave a `.xpac-*` temporary file. A concurrent process can still change
 a target between the final check and the rename; this residual race is documented,
 not hidden.
 
 Removal. Dropping a declaration only reports the target as `undeclared` and keeps its
-receipt; nothing is deleted. `pkgx file remove TARGET [--dry-run|--yes]` deletes a
+receipt; nothing is deleted. `xpac file remove TARGET [--dry-run|--yes]` deletes a
 file only when it still matches its receipt (digest and mode), after preview and
 confirmation: the file is re-hashed through one no-follow descriptor, must still be
 the same inode as the path, is backed up like an adoption, unlinked, and then its

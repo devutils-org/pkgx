@@ -10,27 +10,27 @@ version = 1
 [packages.dnf]
 install = ['hello']
 MANIFEST
-pkgx apply -f /tmp/hello.toml --dry-run --json
-if printf 'no\n' | pkgx apply -f /tmp/hello.toml; then
+xpac apply -f /tmp/hello.toml --dry-run --json
+if printf 'no\n' | xpac apply -f /tmp/hello.toml; then
     fail 'unconfirmed apply unexpectedly succeeded'
 fi
 ! installed hello || fail 'unconfirmed apply changed the system'
-pkgx apply -f /tmp/hello.toml --yes --state-dir /tmp/pkgx-records --json
+xpac apply -f /tmp/hello.toml --yes --state-dir /tmp/xpac-records --json
 installed hello
 dnf5 repoquery --userinstalled --qf '%{name}\n' | grep -qx hello || fail 'request not user-installed'
-pkgx apply -f /tmp/hello.toml --yes --json > /tmp/second-apply.json
+xpac apply -f /tmp/hello.toml --yes --json > /tmp/second-apply.json
 grep -q '"operations":\[\]' /tmp/second-apply.json
-if pkgx remove dnf:dnf5 --dry-run; then
+if xpac remove dnf:dnf5 --dry-run; then
     fail 'protected-package removal preview unexpectedly succeeded'
 fi
-pkgx plan dnf:hello --remove --save /tmp/stale.json --json
+xpac plan dnf:hello --remove --save /tmp/stale.json --json
 dnf5 install -y tree >/dev/null
-if pkgx apply --plan /tmp/stale.json --yes --json; then
+if xpac apply --plan /tmp/stale.json --yes --json; then
     fail 'stale saved plan unexpectedly executed'
 fi
 installed hello
-pkgx plan dnf:hello --remove --save /tmp/review.json --expires-in 300 --json
-pkgx apply --plan /tmp/review.json --yes --state-dir /tmp/pkgx-records --json
+xpac plan dnf:hello --remove --save /tmp/review.json --expires-in 300 --json
+xpac apply --plan /tmp/review.json --yes --state-dir /tmp/xpac-records --json
 ! installed hello || fail 'reviewed removal left the package installed'
-pkgx history --state-dir /tmp/pkgx-records --json > /tmp/history.json
+xpac history --state-dir /tmp/xpac-records --json > /tmp/history.json
 [ "$(grep -o '"success":true' /tmp/history.json | wc -l)" -ge 2 ] || fail 'journal is missing results'

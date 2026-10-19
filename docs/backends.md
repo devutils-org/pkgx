@@ -48,7 +48,7 @@ provider refreshes repositories during inspection. No adapter edits native datab
 
 Pacman `--print` lists targets/dependencies, not the complete transaction including
 replacements, conflicts and hooks. Its plans are always uncertain and cannot be
-executed by pkgx. A missing capability returns an explicit unsupported error;
+executed by xpac. A missing capability returns an explicit unsupported error;
 providers are never substituted.
 
 Primary native references:

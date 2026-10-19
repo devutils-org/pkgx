@@ -1,0 +1,23 @@
+[package]
+name = "xpac-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "xpac"
+path = "src/main.rs"
+
+[dependencies]
+xpac-core = { path = "../xpac-core" }
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+ratatui = { version = "0.29", features = ["unstable-rendered-line-info"] }
+crossterm = "0.28"
+
+[target.'cfg(unix)'.dependencies]
+signal-hook = "0.3"
+
+[dev-dependencies]
+tempfile = "3"

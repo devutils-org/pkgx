@@ -1,7 +1,7 @@
 #!/bin/sh
 # Disposable Fedora root for native RPM/DNF validation, built rootlessly.
 #
-# Usage: tests/sandbox/fedora-userns.sh WORKDIR STATIC_PKGX [RELEASE]
+# Usage: tests/sandbox/fedora-userns.sh WORKDIR STATIC_XPAC [RELEASE]
 #
 # A disposable Arch tool root provides dnf5 (Arch-signed packages). The initial
 # Fedora package set is fetched over TLS from dl.fedoraproject.org without RPM
@@ -12,8 +12,8 @@
 # targets. The Fedora root lives on a tmpfs inside the namespace and disappears
 # with it. CHECK_DIR (default tests/containers) supplies the check scripts.
 set -eu
-WORK=${1:?usage: fedora-userns.sh WORKDIR STATIC_PKGX [RELEASE]}
-PKGX=${2:?usage: fedora-userns.sh WORKDIR STATIC_PKGX [RELEASE]}
+WORK=${1:?usage: fedora-userns.sh WORKDIR STATIC_XPAC [RELEASE]}
+XPAC=${2:?usage: fedora-userns.sh WORKDIR STATIC_XPAC [RELEASE]}
 RELEASE=${3:-44}
 CHECKS=${CHECKS:-rpm.sh dnf-transactions.sh}
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -49,7 +49,7 @@ full env LC_ALL=C pacman --root "$TOOLS" --dbpath "$TOOLS/var/lib/pacman" \
     --sync --refresh --needed --noconfirm --noprogressbar \
     dnf5 libgomp ca-certificates coreutils
 NAME=$(basename "$(mktemp -d "$TOOLS/srv/fedora$RELEASE.XXXXXX")")
-export TOOLS NAME RELEASE CHECKS PKGX CHECK_DIR
+export TOOLS NAME RELEASE CHECKS XPAC CHECK_DIR
 full sh -eu <<'INNER'
 mount -t tmpfs -o mode=0755 tmpfs "$TOOLS/srv/$NAME"
 mount --rbind /dev "$TOOLS/dev"
@@ -65,7 +65,7 @@ chroot "$TOOLS" /usr/bin/env -i PATH=/usr/bin LC_ALL=C \
     sudo shadow-utils grep sed
 FED="$TOOLS/srv/$NAME"
 mkdir -p "$FED/checks"
-cp "$PKGX" "$FED/usr/local/bin/pkgx"
+cp "$XPAC" "$FED/usr/local/bin/xpac"
 mount --bind "$CHECK_DIR" "$FED/checks"
 mount --rbind /dev "$FED/dev"
 mount -t proc proc "$FED/proc"

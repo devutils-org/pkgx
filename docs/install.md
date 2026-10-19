@@ -4,9 +4,9 @@ The project is version 0.1.0 and native execution remains experimental. There is
 no published or certified v1 release. Build from the workspace with Rust stable:
 
 ```sh
-cargo build --release --locked -p pkgx-cli
-./target/release/pkgx --version
-./target/release/pkgx demo
+cargo build --release --locked -p xpac-cli
+./target/release/xpac --version
+./target/release/xpac demo
 ```
 
 Use the actual Cargo target directory when CARGO_TARGET_DIR is configured.
@@ -18,7 +18,7 @@ To install a locally reviewed binary for the current user:
 
 ```sh
 mkdir -p "$HOME/.local/bin"
-install -m 755 target/release/pkgx "$HOME/.local/bin/pkgx"
+install -m 755 target/release/xpac "$HOME/.local/bin/xpac"
 ```
 
 Add `$HOME/.local/bin` to your shell's PATH. Installing the CLI itself does not
@@ -32,10 +32,10 @@ library. It never executes the binary it packages. Record the build compiler and
 package the target you actually built:
 
 ```sh
-rustc -vV > /tmp/pkgx-rustc.txt
+rustc -vV > /tmp/xpac-rustc.txt
 build_target=$(rustc -vV | sed -n 's/^host: //p')
-python3 scripts/package.py --binary target/release/pkgx \
-  --target "$build_target" --rustc-info /tmp/pkgx-rustc.txt --output-dir dist
+python3 scripts/package.py --binary target/release/xpac \
+  --target "$build_target" --rustc-info /tmp/xpac-rustc.txt --output-dir dist
 ```
 
 For cross-compilation, pass the explicit target and matching target-directory
@@ -55,8 +55,8 @@ Use the same toolchain, target, lockfile, source and native linker to compare bu
 Verify a checksum obtained through a trusted channel before extraction:
 
 ```sh
-sha256sum -c pkgx-v0.1.0-TARGET.tar.gz.sha256    # Linux
-shasum -a 256 -c pkgx-v0.1.0-TARGET.tar.gz.sha256 # macOS
+sha256sum -c xpac-v0.1.0-TARGET.tar.gz.sha256    # Linux
+shasum -a 256 -c xpac-v0.1.0-TARGET.tar.gz.sha256 # macOS
 ```
 
 Replace TARGET with the archive's actual target. A checksum detects byte changes;
@@ -65,10 +65,10 @@ uploads build artifacts for review and does not publish a GitHub release.
 
 ## Shell completion
 
-Bash: source `completions/pkgx.bash` from your shell configuration. Zsh: place
-`completions/_pkgx` in a directory on `$fpath`, then initialize `compinit`. Fish:
-copy `completions/pkgx.fish` to `~/.config/fish/completions/pkgx.fish`. Review files
-before installing. `pkgx completions bash|zsh|fish` prints the same definitions.
+Bash: source `completions/xpac.bash` from your shell configuration. Zsh: place
+`completions/_xpac` in a directory on `$fpath`, then initialize `compinit`. Fish:
+copy `completions/xpac.fish` to `~/.config/fish/completions/xpac.fish`. Review files
+before installing. `xpac completions bash|zsh|fish` prints the same definitions.
 
 ## Uninstall the CLI
 
