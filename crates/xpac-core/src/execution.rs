@@ -962,7 +962,10 @@ fn apply_native_guarded(
     }
     let backend = crate::providers::NativeBackend { provider, runner };
     let current = backend.plan(install, remove)?;
-    if &current != preview {
+    // emerge and apk list the same transaction in an order that can change
+    // from one run to the next; the executor builds its own from the
+    // requests, so the order is no part of what was reviewed.
+    if !same_regardless_of_order(preview, &current) {
         return Err(stale(preview, &current));
     }
     if let Some(check) = guard {
@@ -1075,6 +1078,22 @@ fn planned_version(detail: &str) -> Option<&str> {
     Some(version)
 }
 
+/// Two plans with the same operations, warnings and installed packages, each
+/// as many times, whatever their order; the same fingerprint and certainty.
+fn same_regardless_of_order(a: &Plan, b: &Plan) -> bool {
+    fn same_items<T: PartialEq>(a: &[T], b: &[T]) -> bool {
+        a.len() == b.len()
+            && a.iter().all(|x| {
+                a.iter().filter(|y| *y == x).count() == b.iter().filter(|y| *y == x).count()
+            })
+    }
+    a.observed_state_fingerprint == b.observed_state_fingerprint
+        && a.uncertain == b.uncertain
+        && same_items(&a.operations, &b.operations)
+        && same_items(&a.warnings, &b.warnings)
+        && same_items(&a.observed_packages, &b.observed_packages)
+}
+
 /// The refusal when the plan repeated before executing differs from the one
 /// reviewed: what changed, so that a plan that will not hold still can be
 /// diagnosed (bpftrace through Portage, docs/distroproof.md).
@@ -1096,12 +1115,14 @@ fn stale(preview: &Plan, current: &Plan) -> Error {
     });
     if !operations.is_empty() {
         changed.push(format!("operations {}", operations.join(", ")));
-    } else if preview.operations.len() != current.operations.len() {
+    } else if preview.operations != current.operations {
         changed.push("operations reordered".into());
     }
     let warnings = delta(&preview.warnings, &current.warnings, |w| w.clone());
     if !warnings.is_empty() {
         changed.push(format!("warnings {}", warnings.join(", ")));
+    } else if preview.warnings != current.warnings {
+        changed.push("warnings reordered".into());
     }
     let packages = delta(
         &preview.observed_packages,
@@ -1120,6 +1141,8 @@ fn stale(preview: &Plan, current: &Plan) -> Error {
                 String::new()
             }
         ));
+    } else if preview.observed_packages != current.observed_packages {
+        changed.push("installed packages reordered".into());
     }
     if preview.uncertain != current.uncertain {
         changed.push(format!(
@@ -1131,9 +1154,6 @@ fn stale(preview: &Plan, current: &Plan) -> Error {
         && preview.observed_state_fingerprint != current.observed_state_fingerprint
     {
         changed.push("the observed state's fingerprint alone".into());
-    }
-    if changed.is_empty() {
-        changed.push("the order of operations or warnings".into());
     }
     Error::Safety(format!(
         "plan is stale; inspect a new plan before applying (changed: {})",
@@ -1183,6 +1203,45 @@ mod tests {
             "{message}"
         );
         assert!(message.contains("warnings +zstd reinstalled"), "{message}");
+    }
+
+    #[test]
+    fn the_same_plan_in_another_order_is_the_same_plan() {
+        let op = |name: &str| crate::Operation {
+            kind: crate::OperationKind::Install,
+            package: crate::identity::parse_name(crate::ProviderId::Portage, name).unwrap(),
+            risk: crate::RiskLevel::RequiresReview,
+            native_detail: name.into(),
+        };
+        let plan = |ops: Vec<crate::Operation>, warnings: &[&str]| Plan {
+            operations: ops,
+            observed_state_fingerprint: "same".into(),
+            observed_packages: vec![],
+            uncertain: true,
+            warnings: warnings.iter().map(|w| w.to_string()).collect(),
+        };
+        let a = plan(
+            vec![op("sys-libs/zlib"), op("dev-debug/bpftrace")],
+            &["one", "two"],
+        );
+        let b = plan(
+            vec![op("dev-debug/bpftrace"), op("sys-libs/zlib")],
+            &["two", "one"],
+        );
+        assert!(same_regardless_of_order(&a, &b));
+        let Error::Safety(message) = stale(&a, &b) else {
+            panic!()
+        };
+        assert!(
+            message.ends_with("(changed: operations reordered; warnings reordered)"),
+            "{message}"
+        );
+        // a different count of the same operation is a different plan
+        let c = plan(
+            vec![op("sys-libs/zlib"), op("sys-libs/zlib")],
+            &["one", "two"],
+        );
+        assert!(!same_regardless_of_order(&a, &c));
     }
     struct Mock {
         mutated: Mutex<bool>,

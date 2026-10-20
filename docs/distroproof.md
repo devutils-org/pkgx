@@ -216,17 +216,16 @@ bpftrace's zlib); both are fixed and covered by tests. Two QEMU processes of the
 Gentoo cell were killed by an outside SIGKILL on a loaded host; the third run,
 traced, received none and passed.
 
-### Open: bpftrace's plan goes stale on Gentoo
+### bpftrace's plan went stale on Gentoo
 
 Omniscient's cross-tool chain (`distroproof-devutils.toml`, target
 `chain-gentoo`, Portage 3.0.82.2, kernel 6.18.57) asks xpac to install
 `dev-debug/bpftrace` from the Gentoo binhost. On 2026-10-19 and twice on
 2026-10-21 the apply was refused with `plan is stale; inspect a new plan
-before applying`, after the same warnings the plan had printed (zlib, libffi,
-zstd and libxml2 reinstalled at the versions they have). `apply -f` plans,
-then `apply_native_guarded` plans again and requires the two to be equal: for
-this request two successive `emerge --pretend` runs, a few seconds apart, do
-not produce the same plan. The other eleven witnesses install, and an earlier
-run of the same cell installed bpftrace. Which field differs is not known yet:
-the next step is to keep both plans when they differ, in the refusal or in
-the journal, and run the cell again.
+before applying`. `apply -f` plans, then plans again before executing and
+requires the two to be equal. Once the refusal said what changed, the next run
+answered: nothing but the order. Two `emerge --pretend` runs a few seconds
+apart list the same operations and the same warnings in a different order.
+The apk and Portage executors build their own transaction from the requests,
+so the order was never part of what was reviewed: they now compare the two
+plans regardless of order, and any other difference is still refused.
