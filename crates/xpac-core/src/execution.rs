@@ -128,9 +128,7 @@ fn apply_apt_guarded(
     let backend = AptBackend { runner };
     let current = backend.plan(install, remove)?;
     if &current != preview {
-        return Err(Error::Safety(
-            "plan is stale; inspect a new plan before applying".into(),
-        ));
+        return Err(stale(preview, &current));
     }
     if let Some(check) = guard {
         check()?;
@@ -574,9 +572,7 @@ fn apply_pacman_guarded(
     };
     let current = backend.plan(install, remove)?;
     if &current != preview {
-        return Err(Error::Safety(
-            "plan is stale; inspect a new plan before applying".into(),
-        ));
+        return Err(stale(preview, &current));
     }
     if let Some(check) = guard {
         check()?;
@@ -671,9 +667,7 @@ fn apply_dnf_guarded(
     };
     let current = backend.plan(install, remove)?;
     if &current != preview {
-        return Err(Error::Safety(
-            "plan is stale; inspect a new plan before applying".into(),
-        ));
+        return Err(stale(preview, &current));
     }
     if let Some(check) = guard {
         check()?;
@@ -789,9 +783,7 @@ fn apply_brew_guarded(
     };
     let current = backend.plan(install, remove)?;
     if &current != preview {
-        return Err(Error::Safety(
-            "plan is stale; inspect a new plan before applying".into(),
-        ));
+        return Err(stale(preview, &current));
     }
     if let Some(check) = guard {
         check()?;
@@ -866,9 +858,7 @@ fn apply_flatpak_guarded(
     };
     let current = backend.plan(install, remove)?;
     if &current != preview {
-        return Err(Error::Safety(
-            "plan is stale; inspect a new plan before applying".into(),
-        ));
+        return Err(stale(preview, &current));
     }
     if let Some(check) = guard {
         check()?;
@@ -973,9 +963,7 @@ fn apply_native_guarded(
     let backend = crate::providers::NativeBackend { provider, runner };
     let current = backend.plan(install, remove)?;
     if &current != preview {
-        return Err(Error::Safety(
-            "plan is stale; inspect a new plan before applying".into(),
-        ));
+        return Err(stale(preview, &current));
     }
     if let Some(check) = guard {
         check()?;
@@ -1087,10 +1075,115 @@ fn planned_version(detail: &str) -> Option<&str> {
     Some(version)
 }
 
+/// The refusal when the plan repeated before executing differs from the one
+/// reviewed: what changed, so that a plan that will not hold still can be
+/// diagnosed (bpftrace through Portage, docs/distroproof.md).
+fn stale(preview: &Plan, current: &Plan) -> Error {
+    fn delta<T: PartialEq>(before: &[T], after: &[T], show: impl Fn(&T) -> String) -> Vec<String> {
+        let gone = before
+            .iter()
+            .filter(|x| !after.contains(x))
+            .map(|x| format!("-{}", show(x)));
+        let new = after
+            .iter()
+            .filter(|x| !before.contains(x))
+            .map(|x| format!("+{}", show(x)));
+        gone.chain(new).collect()
+    }
+    let mut changed = vec![];
+    let operations = delta(&preview.operations, &current.operations, |op| {
+        op.native_detail.replace('\t', " ")
+    });
+    if !operations.is_empty() {
+        changed.push(format!("operations {}", operations.join(", ")));
+    } else if preview.operations.len() != current.operations.len() {
+        changed.push("operations reordered".into());
+    }
+    let warnings = delta(&preview.warnings, &current.warnings, |w| w.clone());
+    if !warnings.is_empty() {
+        changed.push(format!("warnings {}", warnings.join(", ")));
+    }
+    let packages = delta(
+        &preview.observed_packages,
+        &current.observed_packages,
+        |p| format!("{} {}", p.id, p.version),
+    );
+    if !packages.is_empty() {
+        let shown: Vec<_> = packages.iter().take(6).cloned().collect();
+        let more = packages.len().saturating_sub(shown.len());
+        changed.push(format!(
+            "installed packages {}{}",
+            shown.join(", "),
+            if more > 0 {
+                format!(" and {more} more")
+            } else {
+                String::new()
+            }
+        ));
+    }
+    if preview.uncertain != current.uncertain {
+        changed.push(format!(
+            "uncertain {} -> {}",
+            preview.uncertain, current.uncertain
+        ));
+    }
+    if changed.is_empty()
+        && preview.observed_state_fingerprint != current.observed_state_fingerprint
+    {
+        changed.push("the observed state's fingerprint alone".into());
+    }
+    if changed.is_empty() {
+        changed.push("the order of operations or warnings".into());
+    }
+    Error::Safety(format!(
+        "plan is stale; inspect a new plan before applying (changed: {})",
+        changed.join("; ")
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::{cell::Cell, sync::Mutex};
+
+    #[test]
+    fn a_stale_plan_says_what_changed() {
+        let plan = |warnings: &[&str], detail: &str| Plan {
+            operations: vec![crate::Operation {
+                kind: crate::OperationKind::Install,
+                package: crate::identity::parse_name(
+                    crate::ProviderId::Portage,
+                    "dev-debug/bpftrace",
+                )
+                .unwrap(),
+                risk: crate::RiskLevel::RequiresReview,
+                native_detail: detail.into(),
+            }],
+            observed_state_fingerprint: "same".into(),
+            observed_packages: vec![],
+            uncertain: true,
+            warnings: warnings.iter().map(|w| w.to_string()).collect(),
+        };
+        let before = plan(
+            &["zlib reinstalled"],
+            "dev-debug/bpftrace\t0.26.1-1\tbinary\tN",
+        );
+        let after = plan(
+            &["zlib reinstalled", "zstd reinstalled"],
+            "dev-debug/bpftrace\t0.26.1-2\tbinary\tN",
+        );
+        let Error::Safety(message) = stale(&before, &after) else {
+            panic!()
+        };
+        assert!(message.starts_with("plan is stale; inspect a new plan before applying (changed: "));
+        assert!(
+            message.contains(
+                "-dev-debug/bpftrace 0.26.1-1 binary N, +dev-debug/bpftrace 0.26.1-2 binary N"
+            ),
+            "{message}"
+        );
+        assert!(message.contains("warnings +zstd reinstalled"), "{message}");
+    }
     struct Mock {
         mutated: Mutex<bool>,
     }
