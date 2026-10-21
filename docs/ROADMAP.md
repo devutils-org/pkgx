@@ -189,7 +189,7 @@ Planning and execution are separate: backends can propose native operations; the
 Goal: declare user configuration files (e.g. `~/.tmux.conf`) next to their packages and
 reconcile them with the same diff → plan → apply review flow. This is file ownership,
 not configuration semantics: xpac copies declared content, it does not understand,
-merge or generate tmux/shell/editor options. Design: [ADR 013](docs/adr/013-managed-config-files.md).
+merge or generate tmux/shell/editor options. Design: [ADR 013](adr/013-managed-config-files.md).
 
 Illustrative schema (proposed in ADR 013):
 

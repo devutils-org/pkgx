@@ -4,7 +4,7 @@ Point de reprise enregistré le 19 octobre 2026.
 
 ## Objectif et préférences
 
-Continuer en autonomie l’implémentation de `xpac.md`, avec une interface TUI inspirée de `../atfq` et `../omniscient`. Communiquer en français. Ne pas annoncer 100 % : macOS, CI réelle et publication restent à faire.
+Continuer en autonomie l’implémentation de `docs/ROADMAP.md`, avec une interface TUI inspirée de `../atfq` et `../omniscient`. Communiquer en français. Ne pas annoncer 100 % : macOS, CI réelle et publication restent à faire.
 
 ## État livré
 

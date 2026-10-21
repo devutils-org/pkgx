@@ -62,7 +62,8 @@ Execution support differs by provider: see the [backend matrix](docs/backends.md
 ## Documentation
 
 [CLI and behavior reference](REFERENCE.md) · [Manifests](docs/manifest.md) ·
-[Linux portability](docs/distroproof.md) · [Recipes](docs/recipes.md) · [Validation](docs/validation.md) · [Roadmap](xpac.md)
+[Linux portability](docs/distroproof.md) · [Recipes](docs/recipes.md) · [Validation](docs/validation.md) · [Roadmap](docs/ROADMAP.md) ·
+[All documentation](docs/README.md)
 
 ## Development
 

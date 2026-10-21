@@ -67,9 +67,11 @@ def package(binary, target, output_dir, epoch, rustc_info=None):
         "BUILD.json": ((json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode(), 0o644),
     }
     names = ["README.md", "REFERENCE.md", "CHANGELOG.md", "LICENSE",
-             "LICENSE-MIT", "LICENSE-APACHE", "xpac.md",
+             "LICENSE-MIT", "LICENSE-APACHE", "CONTRIBUTING.md", "SECURITY.md",
              "completions/xpac.bash", "completions/_xpac", "completions/xpac.fish"]
-    names += [str(path.relative_to(ROOT)) for path in sorted((ROOT / "docs").rglob("*.md"))]
+    # docs/dev holds maintainers' working plans, not user documentation.
+    names += [str(path.relative_to(ROOT)) for path in sorted((ROOT / "docs").rglob("*.md"))
+              if path.relative_to(ROOT / "docs").parts[0] != "dev"]
     names += [str(path.relative_to(ROOT)) for path in sorted((ROOT / "examples").glob("*.toml"))]
     for name in names:
         files[name] = (regular_bytes(ROOT / name), 0o644)
