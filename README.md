@@ -26,7 +26,16 @@ Linux x86_64 portability is checked with installed GNU/musl releases across
 
 ## Install
 
-From a source checkout with Rust stable:
+Download an archive from the [releases](https://github.com/devutils-org/xpac/releases)
+(Linux x86_64 GNU or static musl, macOS arm64), verify it, then install the binary:
+
+```sh
+gh attestation verify xpac-v0.1.0-x86_64-unknown-linux-musl.tar.gz --repo devutils-org/xpac
+tar xzf xpac-v0.1.0-x86_64-unknown-linux-musl.tar.gz
+install -m 755 xpac-v0.1.0-x86_64-unknown-linux-musl/xpac ~/.local/bin/
+```
+
+Or from a source checkout with Rust stable:
 
 ```sh
 cargo build --release --locked -p xpac-cli

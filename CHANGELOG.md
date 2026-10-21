@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-10-21
+
+- Tagged releases: the artifacts workflow attests each archive's build provenance
+  (Sigstore, `gh attestation verify`) and opens a draft GitHub release with
+  `SHA256SUMS`. The macOS binary is not notarized.
+- Run the Flatpak transaction checks in CI, in a disposable Arch container against a
+  local repository.
 
 - Add the apk (Alpine, apk-tools 2.12 and 3.x) and Portage (Gentoo, 3.0) providers:
   inventory with WORLD/world-set marks, native previews (`apk --simulate`, `emerge

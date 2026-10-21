@@ -1,6 +1,10 @@
 name: Build reviewable release artifacts
+# Manual runs upload reviewable artifacts only. Pushing a tag such as v0.1.0 also
+# attests each archive's build provenance (Sigstore) and opens a draft release.
 on:
   workflow_dispatch:
+  push:
+    tags: ['v*']
 permissions:
   contents: read
 jobs:
@@ -15,9 +19,20 @@ jobs:
           - os: macos-latest
             flavor: host
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Tag matches Cargo.toml
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          test "v$version" = "$GITHUB_REF_NAME" || {
+            echo "tag $GITHUB_REF_NAME, but Cargo.toml says $version"; exit 1; }
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -63,3 +78,29 @@ jobs:
           path: |
             dist/xpac-*.tar.gz
             dist/xpac-*.tar.gz.sha256
+      - name: Attest build provenance
+        if: github.ref_type == 'tag'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/xpac-*.tar.gz
+
+  release:
+    name: Draft release
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum xpac-*.tar.gz > SHA256SUMS
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "xpac $GITHUB_REF_NAME" --generate-notes

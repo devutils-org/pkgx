@@ -1,7 +1,9 @@
 # Build, verify and install
 
-The project is version 0.1.0 and native execution remains experimental. There is
-no published or certified v1 release. Build from the workspace with Rust stable:
+The project is version 0.1.0 and native execution remains experimental; 0.1.0 is
+not a certified v1. Release archives are on the
+[releases page](https://github.com/devutils-org/xpac/releases) (see
+[Verify a release](#verify-a-release)). To build from the workspace with Rust stable:
 
 ```sh
 cargo build --release --locked -p xpac-cli
@@ -70,8 +72,23 @@ shasum -a 256 -c xpac-v0.1.0-TARGET.tar.gz.sha256 # macOS
 ```
 
 Replace TARGET with the archive's actual target. A checksum detects byte changes;
-it is not a signature or proof of publisher identity. The artifacts workflow
-uploads build artifacts for review and does not publish a GitHub release.
+it is not a signature or proof of publisher identity. A manual run of the
+artifacts workflow uploads build artifacts for review and publishes nothing.
+
+## Verify a release
+
+Pushing a version tag runs the same workflow, which also records a Sigstore build
+provenance attestation for each archive and opens a draft GitHub release with the
+archives, their `.sha256` files and `SHA256SUMS`. The draft is published by hand
+after review. The attestation ties the archive's bytes to this repository, the
+workflow and the tagged commit:
+
+```sh
+gh attestation verify xpac-v0.1.0-TARGET.tar.gz --repo devutils-org/xpac
+```
+
+The macOS binary is not notarized by Apple; a browser download is quarantined by
+Gatekeeper (`xattr -d com.apple.quarantine xpac` after verifying it).
 
 ## Shell completion
 

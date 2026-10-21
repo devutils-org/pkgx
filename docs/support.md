@@ -6,7 +6,7 @@
 | Debian Bookworm / Ubuntu 24.04 APT | Injected-runner tests + rootless debootstrap roots: inspection, transactions, strict mode, noninteractive sudo (tests/sandbox/debian-userns.sh) | Disposable inspection + transactions | CI passed (GitHub Actions run 39143547380); not certified |
 | Arch Pacman | Fixtures + injected executor tests + disposable user-namespace Arch root: inspection and transactions (tests/sandbox/arch-userns.sh) | Disposable inspection + transactions | CI passed (GitHub Actions run 39143547380); not certified |
 | Fedora 44 RPM/DNF5 | Fixtures + injected executor tests + rootless Fedora root: inspection and transactions (tests/sandbox/fedora-userns.sh) | Disposable inspection + transactions | CI passed (GitHub Actions run 39143547380); not certified |
-| Flatpak default user/system | Scoped injected-runner tests + rootless Arch root with a local repository (tests/sandbox/flatpak-userns.sh) | Not yet configured | No |
+| Flatpak default user/system | Scoped injected-runner tests + rootless Arch root with a local repository (tests/sandbox/flatpak-userns.sh); Flatpak 1.18 in a rootless Podman Arch container (2026-10-21) | Disposable Arch container: transactions against a local repository | Not certified |
 | Alpine apk | Fixtures + injected executor tests; apk-tools 2.14 output in an Alpine 3.22 container | Distroproof Alpine 3.24 (apk-tools 3.0.6): inspection + transactions | Not certified |
 | Gentoo Portage | Fixtures + injected executor tests | Distroproof Gentoo (Portage 3.0.82): inspection + transactions | Not certified |
 | Homebrew | JSON fixtures + injected executor tests + Homebrew 7.0.9 on Linux in a rootless Arch root (tests/sandbox/brew-userns.sh) | macOS build, inventory and formula transactions | CI passed on macOS ({CI}); casks unsupported |
@@ -28,12 +28,14 @@ Run fmt, workspace clippy with -D warnings and workspace tests before changes ar
 considered validated. Cargo.lock is checked in. `cargo run -p xpac-cli -- completions
 bash` (or zsh/fish) prints completion definitions; installation is explicit.
 
-The manually triggered artifacts workflow builds/tests Linux and macOS binaries,
-packages archives and emits SHA-256 checksum files. It uploads reviewable artifacts
-but creates no GitHub release and publishes nothing. It passed in artifacts run 39143553843
+The artifacts workflow builds/tests Linux and macOS binaries, packages archives and
+emits SHA-256 checksum files. Run by hand, it uploads reviewable artifacts and
+publishes nothing; on a version tag it also attests build provenance (Sigstore)
+and opens a draft release ([verify a release](install.md#verify-a-release)). It passed in artifacts run 39143553843
 (7b6d4a7): x86_64 Linux gnu and musl archives and an aarch64 macOS archive, each
 checksum-verified after download; the musl binary ran `--version` and `providers`. Local archives are built with
-`scripts/package.py` and include version/target/build metadata and documentation. Signing/notarization is pending.
+`scripts/package.py` and include version/target/build metadata and documentation. Archives are signed by
+build provenance attestation; the macOS binary is not notarized.
 
 For comparable builds use the same Rust toolchain, target and Cargo.lock. A floating
 stable toolchain and native linker do not guarantee byte-for-byte reproducibility.

@@ -47,6 +47,9 @@ jobs:
             check: pacman -Sy --noconfirm && sh /checks/pacman.sh && sh /checks/pacman-transactions.sh
           - image: fedora:latest
             check: sh /checks/rpm.sh && sh /checks/dnf-transactions.sh
+          # A tiny runtime and app in a local repository; no Flatpak remote is contacted.
+          - image: archlinux:base
+            check: pacman -Sy --noconfirm --needed flatpak && sh /checks/flatpak-transactions.sh
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
