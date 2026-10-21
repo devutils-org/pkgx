@@ -30,8 +30,10 @@ Download an archive from the [releases](https://github.com/devutils-org/xpac/rel
 (Linux x86_64 GNU or static musl, macOS arm64), verify it, then install the binary:
 
 ```sh
-gh attestation verify xpac-v0.1.0-x86_64-unknown-linux-musl.tar.gz --repo devutils-org/xpac
-tar xzf xpac-v0.1.0-x86_64-unknown-linux-musl.tar.gz
+curl -fLO https://github.com/devutils-org/xpac/releases/download/v0.1.0/xpac-v0.1.0-x86_64-unknown-linux-musl.tar.gz && \
+gh attestation verify xpac-v0.1.0-x86_64-unknown-linux-musl.tar.gz --repo devutils-org/xpac && \
+tar xzf xpac-v0.1.0-x86_64-unknown-linux-musl.tar.gz && \
+mkdir -p ~/.local/bin && \
 install -m 755 xpac-v0.1.0-x86_64-unknown-linux-musl/xpac ~/.local/bin/
 ```
 
