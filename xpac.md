@@ -345,8 +345,9 @@ Native transactions, recipe scripts and cleanup ran only inside disposable rootl
 roots (tests/sandbox/); no host package transaction, downloaded script or cleanup
 operation has run on the workstation. The configured CI jobs (containers, recipe and
 managed-file sandboxes, macOS Homebrew and managed files) passed in GitHub Actions run 39143547380.
-Release signing, notarization and a published release remain open; Flatpak has no
-CI job. See docs/support.md for limits.
+Flatpak transactions run in CI too (run 39558744977). Tagged releases attest build
+provenance and open a draft release; macOS notarization stays out of scope. See
+docs/support.md for limits.
 
 Latest local checkpoint (2026-10-18): 169 Rust tests and 2 packaging tests passed;
 native scenarios passed in rootless disposable roots for Debian bookworm, Ubuntu
