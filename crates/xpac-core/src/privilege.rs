@@ -16,6 +16,8 @@ pub const SUDO: &str = "/usr/bin/sudo";
 pub const APT: &str = "/usr/bin/apt-get";
 pub const PACMAN: &str = "/usr/bin/pacman";
 pub const DNF: &str = "/usr/bin/dnf5";
+/// DNF4's command (`dnf-3` behind it on RHEL 8 and 9), ADR 016.
+pub const DNF4: &str = "/usr/bin/dnf";
 pub const APK: &str = "/sbin/apk";
 pub const EMERGE: &str = "/usr/bin/emerge";
 pub trait SudoAuthenticator {
@@ -85,6 +87,7 @@ impl CommandRunner for SudoAptRunner<'_> {
             }
             "apt-get" if crate::cache::sudo_template("apt-get", &spec.args) => APT,
             "dnf5" if dnf_transaction(&spec.args) => DNF,
+            "dnf" if dnf4_transaction(&spec.args) => DNF4,
             "pacman"
                 if pacman_transaction(&spec.args)
                     || crate::cache::sudo_template("pacman", &spec.args) =>
@@ -110,16 +113,30 @@ impl CommandRunner for SudoAptRunner<'_> {
 }
 
 fn dnf_transaction(args: &[String]) -> bool {
-    [crate::providers::DNF_INSTALL, crate::providers::DNF_REMOVE]
-        .iter()
-        .any(|template| {
-            let prefix = &template[1..];
-            args.len() > prefix.len()
-                && args.iter().zip(prefix.iter()).all(|(a, b)| a == b)
-                && args[prefix.len()..]
-                    .iter()
-                    .all(|t| crate::providers::split_nevra(t).is_ok())
-        })
+    nevra_transaction(
+        &[crate::providers::DNF_INSTALL, crate::providers::DNF_REMOVE],
+        args,
+    )
+}
+fn dnf4_transaction(args: &[String]) -> bool {
+    nevra_transaction(
+        &[
+            crate::providers::DNF4_INSTALL,
+            crate::providers::DNF4_REMOVE,
+        ],
+        args,
+    )
+}
+/// Exactly one of `templates` (program excluded) followed by valid NEVRAs only.
+fn nevra_transaction(templates: &[&[&str]], args: &[String]) -> bool {
+    templates.iter().any(|template| {
+        let prefix = &template[1..];
+        args.len() > prefix.len()
+            && args.iter().zip(prefix.iter()).all(|(a, b)| a == b)
+            && args[prefix.len()..]
+                .iter()
+                .all(|t| crate::providers::split_nevra(t).is_ok())
+    })
 }
 /// Exactly an executor template followed by non-option targets.
 fn pacman_transaction(args: &[String]) -> bool {
@@ -220,7 +237,9 @@ fn verify_environment(provider: crate::ProviderId) -> Result<(), Error> {
             &["APT_CONFIG", "DPKG_ROOT", "DPKG_ADMINDIR"],
         ),
         crate::ProviderId::Pacman => ("pacman", PACMAN, &[]),
-        crate::ProviderId::Dnf => ("dnf5", DNF, &[]),
+        // DNF5 where it is installed, else DNF4's `dnf`: what the executor runs.
+        crate::ProviderId::Dnf if Path::new(DNF).exists() => ("dnf5", DNF, &[]),
+        crate::ProviderId::Dnf => ("dnf", DNF4, &[]),
         crate::ProviderId::Apk => ("apk", APK, &[]),
         crate::ProviderId::Portage => ("emerge", EMERGE, &["PORTAGE_CONFIGROOT", "ROOT", "EROOT"]),
         _ => {

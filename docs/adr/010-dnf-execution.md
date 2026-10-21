@@ -1,7 +1,7 @@
 # ADR 010: DNF5 preview and execution
 
 Status: implemented experimentally; injected-runner regressions and a disposable
-rootless Fedora 44 root (docs/validation.md). DNF4 is not supported for previews.
+rootless Fedora 44 root (docs/validation.md). DNF4 is ADR 016.
 
 Preview. `dnf5 install|remove --assumeyes --store=DIR` resolves the transaction
 and writes it as `transaction.json` without running it; packages are downloaded

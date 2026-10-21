@@ -691,10 +691,11 @@ fn apply_dnf_guarded(
             .map(str::to_owned)
             .ok_or_else(|| Error::Safety("reviewed DNF operation lacks a NEVRA".into()))
     };
+    let (install_template, remove_template) = crate::providers::dnf_generation(runner)?.templates();
     let template = if remove.is_empty() {
-        crate::providers::DNF_INSTALL
+        install_template
     } else {
-        crate::providers::DNF_REMOVE
+        remove_template
     };
     let mut spec = CommandSpec::new(template[0], &template[1..]);
     spec.requires_privilege = true;

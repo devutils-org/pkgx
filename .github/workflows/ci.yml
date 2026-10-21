@@ -47,6 +47,9 @@ jobs:
             check: pacman -Sy --noconfirm && sh /checks/pacman.sh && sh /checks/pacman-transactions.sh
           - image: fedora:latest
             check: sh /checks/rpm.sh && sh /checks/dnf-transactions.sh
+          # DNF4 (ADR 016): its own resolver previews, `dnf` executes.
+          - image: rockylinux:9
+            check: sh /checks/rpm.sh && PKG=bc DRIFT=tree sh /checks/dnf-transactions.sh
           # A tiny runtime and app in a local repository; no Flatpak remote is contacted.
           - image: archlinux:base
             check: pacman -Sy --noconfirm --needed flatpak && sh /checks/flatpak-transactions.sh

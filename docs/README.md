@@ -22,7 +22,7 @@ Start with the [README](../README.md), then the [CLI reference](../REFERENCE.md)
 ## Design
 
 - [Roadmap](ROADMAP.md): the product contract, milestones M0–M8
-- [Decisions](adr/): one ADR per design choice, 001 to 015
+- [Decisions](adr/): one ADR per design choice, 001 to 016
 
 Maintainers' working plans and notes are in [dev/](dev/); they are not user
 documentation.

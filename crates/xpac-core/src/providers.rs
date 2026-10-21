@@ -860,6 +860,81 @@ fn pacman_policy(
 /// Executor-built DNF5 transactions; sudo delegation accepts only these prefixes.
 pub const DNF_INSTALL: &[&str] = &["dnf5", "install", "--assumeyes"];
 pub const DNF_REMOVE: &[&str] = &["dnf5", "remove", "--assumeyes", "--no-autoremove"];
+/// The same for DNF4 (`dnf`, RHEL 8 and 9 and their rebuilds), ADR 016.
+pub const DNF4_INSTALL: &[&str] = &["dnf", "install", "--assumeyes"];
+pub const DNF4_REMOVE: &[&str] = &["dnf", "remove", "--assumeyes", "--noautoremove"];
+
+/// Which DNF the machine runs: `dnf --version` prints `dnf5 version 5...` for
+/// DNF5 and a bare `4...` for DNF4 (where `dnf` is `dnf-3`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DnfGeneration {
+    Five,
+    Four,
+}
+pub fn dnf_generation(runner: &dyn CommandRunner) -> Result<DnfGeneration, Error> {
+    let text = output(runner, CommandSpec::new("dnf", &["--version"]))?;
+    let first = text.lines().next().unwrap_or_default().trim();
+    if first.starts_with("dnf5") || first.starts_with("5.") {
+        Ok(DnfGeneration::Five)
+    } else if first.starts_with("4.") {
+        Ok(DnfGeneration::Four)
+    } else {
+        Err(Error::Unsupported(format!(
+            "unrecognized dnf version {first:?}"
+        )))
+    }
+}
+impl DnfGeneration {
+    /// The executor's install and remove templates.
+    pub fn templates(self) -> (&'static [&'static str], &'static [&'static str]) {
+        match self {
+            DnfGeneration::Five => (DNF_INSTALL, DNF_REMOVE),
+            DnfGeneration::Four => (DNF4_INSTALL, DNF4_REMOVE),
+        }
+    }
+}
+
+/// DNF4 has no `--store`: its own resolver, through the `dnf` Python module it
+/// is written in, computes the transaction and prints it as dnf5's stored
+/// transaction would, without running or downloading anything but metadata. Upgraded (the
+/// old side of an upgrade) is spelled Replaced, as dnf5 spells it; any other
+/// action (obsoletes, downgrades, reinstalls) passes through and is refused.
+pub const DNF4_RESOLVE: &str = r#"import json, os, sys
+import dnf, dnf.yum.misc, libdnf.transaction as T
+op, specs = sys.argv[1], sys.argv[2:]
+base = dnf.Base()
+base.conf.read()
+# What the dnf command does and the module does not: /etc/dnf/vars, where
+# Rocky 9 defines the $rltype its mirror list needs.
+base.conf.substitutions.update_from_etc(base.conf.installroot)
+if os.geteuid() != 0:
+    base.conf.cachedir = dnf.yum.misc.getCacheDir()
+base.conf.clean_requirements_on_remove = False
+base.read_all_repos()
+base.fill_sack(load_system_repo=True, load_available_repos=(op == "install"))
+for spec in specs:
+    (base.install if op == "install" else base.remove)(spec)
+base.resolve(allow_erasing=False)
+names = {T.TransactionItemAction_INSTALL: "Install", T.TransactionItemAction_UPGRADE: "Upgrade",
+         T.TransactionItemAction_UPGRADED: "Replaced", T.TransactionItemAction_REMOVE: "Remove"}
+rpms = []
+for item in base.transaction:
+    p = item.pkg
+    rpms.append({"nevra": "%s-%s:%s-%s.%s" % (p.name, p.epoch, p.version, p.release, p.arch),
+                 "action": names.get(item.action, "action %s" % item.action),
+                 "reason": T.TransactionItemReasonToString(item.reason) or "unknown",
+                 "repo_id": p.reponame or "unknown"})
+print(json.dumps({"version": "dnf4", "rpms": rpms}))
+"#;
+
+/// The Python DNF4 runs on: RHEL 8's platform-python, else python3.
+fn dnf4_python() -> &'static str {
+    if std::path::Path::new("/usr/libexec/platform-python").exists() {
+        "/usr/libexec/platform-python"
+    } else {
+        "python3"
+    }
+}
 /// Split a DNF NEVRA (`name-[epoch:]version-release.arch`) into name, arch and the
 /// `epoch:version-release` form used by the RPM inventory.
 pub fn split_nevra(nevra: &str) -> Result<(String, String, String), Error> {
@@ -911,6 +986,35 @@ fn dnf_plan(
         runner,
     }
     .inventory()?;
+    let generation = dnf_generation(runner)?;
+    let targets: Vec<String> = requests
+        .iter()
+        .map(|id| match &id.architecture_or_scope {
+            Some(arch) => format!("{}.{arch}", id.name),
+            None => id.name.clone(),
+        })
+        .collect();
+    if generation == DnfGeneration::Four {
+        let mut spec = CommandSpec::new(
+            dnf4_python(),
+            &[
+                "-c",
+                DNF4_RESOLVE,
+                if remove.is_empty() {
+                    "install"
+                } else {
+                    "remove"
+                },
+            ],
+        );
+        spec.args.extend(targets);
+        let value: serde_json::Value = serde_json::from_str(output(runner, spec)?.trim())
+            .map_err(|_| Error::Parse("invalid DNF4 resolved transaction".into()))?;
+        let warnings = vec![
+            "DNF4 preview is the transaction dnf's own resolver (its Python module) computed without running it; execution re-resolves with reviewed NEVRAs pinned and verifies the result.".into(),
+        ];
+        return dnf_transaction_plan(&value, "dnf4", remove.is_empty(), observed, warnings);
+    }
     let directory = tempfile::tempdir().map_err(|source| Error::Io {
         program: "DNF preview staging".into(),
         source,
@@ -928,20 +1032,14 @@ fn dnf_plan(
             .to_str()
             .ok_or_else(|| Error::InvalidInput("temporary path is not UTF-8".into()))?
     ));
-    for id in requests {
-        spec.args.push(match &id.architecture_or_scope {
-            Some(arch) => format!("{}.{arch}", id.name),
-            None => id.name.clone(),
-        });
-    }
+    spec.args.extend(targets);
     output(runner, spec)?;
     let json = store.join("transaction.json");
-    let mut operations = vec![];
-    let mut warnings = vec![
+    let warnings = vec![
         "DNF preview is a resolved dnf5 transaction stored without running it; execution re-resolves with reviewed NEVRAs pinned and verifies the result.".into(),
         "Packages were downloaded into a temporary directory for the preview and discarded.".into(),
     ];
-    if json.exists() {
+    let value = if json.exists() {
         use std::io::Read;
         let mut text = String::new();
         std::fs::File::open(&json)
@@ -950,10 +1048,26 @@ fn dnf_plan(
                 program: "DNF stored transaction".into(),
                 source,
             })?;
-        let value: serde_json::Value = serde_json::from_str(&text)
-            .map_err(|_| Error::Parse("invalid dnf5 transaction.json".into()))?;
-        if value.get("version").and_then(|v| v.as_str()) != Some("1.0") {
-            return Err(Error::Unsupported("dnf5 stored transaction version".into()));
+        serde_json::from_str(&text)
+            .map_err(|_| Error::Parse("invalid dnf5 transaction.json".into()))?
+    } else {
+        serde_json::json!({"version": "1.0", "rpms": []})
+    };
+    dnf_transaction_plan(&value, "1.0", remove.is_empty(), observed, warnings)
+}
+
+/// A resolved transaction, dnf5's stored one or DNF4's printed as it, as a plan.
+fn dnf_transaction_plan(
+    value: &serde_json::Value,
+    version: &str,
+    installing: bool,
+    observed: Vec<InstalledPackage>,
+    mut warnings: Vec<String>,
+) -> Result<Plan, Error> {
+    let mut operations = vec![];
+    {
+        if value.get("version").and_then(|v| v.as_str()) != Some(version) {
+            return Err(Error::Unsupported("dnf stored transaction version".into()));
         }
         if value
             .as_object()
@@ -981,7 +1095,7 @@ fn dnf_plan(
                 field("repo_id")?,
             );
             let (name, arch, _) = split_nevra(nevra)?;
-            let kind = match (action, remove.is_empty()) {
+            let kind = match (action, installing) {
                 ("Install" | "Upgrade", true) => OperationKind::Install,
                 ("Remove", false) => OperationKind::Remove,
                 // The old side of an upgrade; verified through the new version.
@@ -1006,12 +1120,12 @@ fn dnf_plan(
         }
     }
     if operations.is_empty() {
-        if !remove.is_empty() {
-            return Err(Error::Parse("dnf5 removal produced no operations".into()));
+        if !installing {
+            return Err(Error::Parse("dnf removal produced no operations".into()));
         }
         warnings.push("Requested packages are already installed; nothing to do.".into());
     }
-    if !remove.is_empty() {
+    if !installing {
         warnings.push("Removal uses --no-autoremove: dependencies stay installed.".into());
     }
     Ok(Plan {

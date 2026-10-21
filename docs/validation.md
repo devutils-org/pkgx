@@ -36,6 +36,18 @@ Bash/Zsh completions and POSIX container scripts pass syntax checks without nati
 transaction execution. Workflow YAML syntax is checked separately from execution.
 Fish is unavailable, so its completion definition has not been parsed by Fish.
 
+## DNF4 in disposable Rocky Linux guests — 2026-10-21
+
+`tests/containers/dnf-transactions.sh` (now generation-agnostic: `dnf5` or `dnf`,
+the protected package of each, `PKG`/`DRIFT` chosen per distribution) ran as root
+in Distroproof guests with the static musl xpac, `PKG=bc DRIFT=tree`: Rocky 8
+(DNF 4.7.0) and Rocky 9 (DNF 4.14.0) both passed -- dry-run, refused unconfirmed
+apply, confirmed apply with a user-installed request, empty second apply,
+refused removal of the protected `dnf`, refused stale saved plan, reviewed
+removal, journal results. Rocky 9 first failed: the resolver did not read
+`/etc/dnf/vars`, and its mirror list needs `$rltype`. The same check passed in a
+rootless Podman `rockylinux:9` container, the CI job's image.
+
 ## Disposable Arch root — 2026-10-18
 
 Environment: Linux x86_64 Arch host, Pacman 7.1.0 / libalpm 16.0.1, bubblewrap 0.13.1.
