@@ -191,7 +191,8 @@ Docker/Podman and APT are unavailable locally; container evidence comes from CI.
 Flatpak transactions run in CI in a disposable Arch container against a local
 repository (passed in GitHub Actions run 39558744977). No native package transaction,
 downloaded installation script or cleanup operation has run on the host. No release
-is published yet; tagged releases are attested, and macOS binaries are not notarized.
+other than v0.1.0 (artifacts run 39559531645): its archives carry build provenance
+attestations, verified after download; macOS binaries are not notarized.
 
 Homebrew casks, cross-provider atomic execution and automatic cleanup beyond native
 cache commands and reviewed orphan removal remain unsupported. Sudo authentication

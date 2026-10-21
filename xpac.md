@@ -179,7 +179,7 @@ Planning and execution are separate: backends can propose native operations; the
 - [x] Add regression suites for package locks, partial transactions, interruptions, stale plans, and provider failures.
 - [x] Validate on a documented support matrix; run macOS smoke tests. (GitHub Actions run 39143547380 on 7b6d4a7: Debian bookworm/Ubuntu 24.04 APT, Arch Pacman and Fedora DNF5 transactions in disposable containers, bubblewrap recipe and managed-file sandboxes, macOS Homebrew transactions and managed files; see docs/support.md. Not a certification.)
 - [x] Write installation, security, manifest, backend capability, and recovery documentation.
-- [x] Provide shell completions, release binaries, changelog, reproducible build instructions where feasible. (artifacts run 39143553843: Linux gnu/musl and macOS arm64 archives with verified SHA-256 checksums, uploaded as reviewable workflow artifacts. No GitHub release is published; signing/notarization remain open.)
+- [x] Provide shell completions, release binaries, changelog, reproducible build instructions where feasible. (artifacts run 39143553843: Linux gnu/musl and macOS arm64 archives with verified SHA-256 checksums, uploaded as reviewable workflow artifacts. v0.1.0 is published from artifacts run 39559531645 with build provenance attestations, verified after download; macOS notarization is out of scope.)
 - [x] Perform security review of script execution, privilege boundaries, and cleanup operations. (Internal review recorded in docs/security-review.md; no independent audit.)
 
 **Acceptance**: documented support matrix passes CI; all mutating operations are plan-driven; known limitations are published; release artifacts are verified.
