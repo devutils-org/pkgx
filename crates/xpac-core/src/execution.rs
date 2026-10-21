@@ -259,8 +259,9 @@ fn run_verified(
         Ok(output) => {
             if output.status != Some(0) {
                 errors.push(format!(
-                    "native transaction failed with status {:?}; partial changes may remain",
-                    output.status
+                    "native transaction failed with status {:?}; partial changes may remain{}",
+                    output.status,
+                    native_said(&output.stderr)
                 ));
             }
             output.status
@@ -1098,6 +1099,25 @@ fn same_regardless_of_order(a: &Plan, b: &Plan) -> bool {
 /// The refusal when the plan repeated before executing differs from the one
 /// reviewed: what changed, so that a plan that will not hold still can be
 /// diagnosed (bpftrace through Portage, docs/distroproof.md).
+/// The native tool's own last words, for a failure record: its last few
+/// non-empty stderr lines, bounded. Without them a record said "status 100"
+/// and the reason (Debian 11's security archive answering 404 for a package
+/// its index still listed, 2026-10-21) needed a fresh machine to find.
+fn native_said(stderr: &[u8]) -> String {
+    let text = String::from_utf8_lossy(stderr);
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    if lines.is_empty() {
+        return String::new();
+    }
+    let tail = lines[lines.len().saturating_sub(4)..].join(" | ");
+    let tail: String = tail.chars().take(600).collect();
+    format!("; the native tool said: {tail}")
+}
+
 fn stale(preview: &Plan, current: &Plan) -> Error {
     fn delta<T: PartialEq>(before: &[T], after: &[T], show: impl Fn(&T) -> String) -> Vec<String> {
         let gone = before
@@ -1164,6 +1184,19 @@ fn stale(preview: &Plan, current: &Plan) -> Error {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_failure_record_carries_the_native_tools_last_words() {
+        let apt = b"Fetched 84.5 kB in 0s (1411 kB/s)\n\nE: Failed to fetch http://security.debian.org/sysstat.deb  404  Not Found\nE: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?\n";
+        let said = super::native_said(apt);
+        assert!(
+            said.contains("404  Not Found") && said.contains("Unable to fetch"),
+            "{said}"
+        );
+        assert!(!said.contains('\n'));
+        assert_eq!(super::native_said(b"\n  \n"), "");
+        assert!(super::native_said("x".repeat(5000).as_bytes()).len() < 700);
+    }
+
     use super::*;
     use std::{cell::Cell, sync::Mutex};
 

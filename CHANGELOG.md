@@ -5,6 +5,9 @@
 - DNF4 (RHEL 8 and 9, Rocky, AlmaLinux): previews through DNF4's own resolver
   and confirmed, verified execution with `dnf`, as DNF5's (ADR 016). Validated
   in disposable Rocky 8 and 9 guests; Rocky 9 runs in CI.
+- A failed native transaction's record carries the tool's last stderr lines
+  (bounded): a record that said only `status 100` hid Debian 11's security
+  archive answering 404 for a package its index still listed.
 
 ## 0.1.0 — 2026-10-21
 
