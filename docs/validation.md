@@ -190,9 +190,9 @@ Linux musl and macOS arm64 archives; they were downloaded and re-verified locall
 Docker/Podman and APT are unavailable locally; container evidence comes from CI.
 Flatpak transactions run in CI in a disposable Arch container against a local
 repository (passed in GitHub Actions run 39558744977). No native package transaction,
-downloaded installation script or cleanup operation has run on the host. No release
-other than v0.1.0 (artifacts run 39559531645): its archives carry build provenance
-attestations, verified after download; macOS binaries are not notarized.
+downloaded installation script or cleanup operation has run on the host. v0.1.0
+is published (artifacts run 39559531645); its archives carry build provenance
+attestations, verified after download. macOS binaries are not notarized.
 
 Homebrew casks, cross-provider atomic execution and automatic cleanup beyond native
 cache commands and reviewed orphan removal remain unsupported. Sudo authentication
